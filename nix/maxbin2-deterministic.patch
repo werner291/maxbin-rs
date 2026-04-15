@@ -1,0 +1,149 @@
+Patch the original MaxBin2 Perl scripts for deterministic equivalence testing.
+
+Applied to the original MaxBin2 2.2.7 source when building via Nix (see
+nix/maxbin2.nix). The determinism changes make the output reproducible so
+we can compare it against the Rust reimplementation. Note that sorting hash
+keys changes seed ordering, which changes EM initialization, which MAY
+change the final bins — we do not know whether the original's random
+iteration order served as implicit regularization.
+
+Three kinds of changes:
+
+1. DETERMINISM: Replace `keys %hash` with `sort keys %hash` in 7 places
+   across _getmarker.pl, _sepReads.pl, and run_MaxBin.pl. Perl 5.18+
+   randomizes hash iteration order for security, which means the original
+   MaxBin2 produces different seed orderings (and therefore different bins)
+   on every run. Sorting makes the output reproducible.
+
+2. DEBUG LOGGING: Add `warn "[perl-seeds] ..."` statements to _getmarker.pl
+   so we can see which markers are found, which seed is selected, and why.
+   These go to stderr and do not affect stdout or output files.
+
+3. UNUSED IMPORT: Remove `use LWP::Simple` from run_MaxBin.pl — this module
+   is imported but never called, and it pulls in the entire libwww-perl
+   dependency tree.
+
+--- a/_getmarker.pl	2020-06-12 11:27:25.000000000 +0200
++++ b/_getmarker.pl	2026-04-14 23:52:45.071744729 +0200
+@@ -79,7 +79,7 @@
+ 							# Flush tmphash content to queryhash
+ 							$queryhash{$current} = $querycount;
+ 							$queryseqnum[$querycount] = 0;
+-							foreach $tmp1 (keys %tmphash)
++							foreach $tmp1 (sort keys %tmphash)
+ 							{
+ 								$queryseq[$querycount][$queryseqnum[$querycount]] = $tmp1;
+ 								$queryseqnum[$querycount]++;
+@@ -107,7 +107,7 @@
+ 		# Flush tmphash content to queryhash
+ 		$queryhash{$current} = $querycount;
+ 		$queryseqnum[$querycount] = 0;
+-		foreach $tmp1 (keys %tmphash)
++		foreach $tmp1 (sort keys %tmphash)
+ 		{
+ 			$queryseq[$querycount][$queryseqnum[$querycount]] = $tmp1;
+ 			$queryseqnum[$querycount]++;
+@@ -116,6 +116,10 @@
+ 	}
+ 	close(LOCALFILE);
+ 
++	# Debug: log all markers
++	for my $dbg_mk (sort keys %queryhash) { warn "[perl-seeds]   marker=$dbg_mk contigs=$queryseqnum[$queryhash{$dbg_mk}] query_len=$querylen[$queryhash{$dbg_mk}]\n"; }
++	warn "[perl-seeds] " . scalar(keys %queryhash) . " markers found, querycount=$querycount\n";
++	warn "[perl-seeds] queryseqnum array (length=" . scalar(@queryseqnum) . "): " . join(",", @queryseqnum) . "\n";
+ 	if ((scalar keys %queryhash) == 0)
+ 	{
+ 		return(-1);
+@@ -123,7 +127,7 @@
+ 
+ =print marker gene information
+ 	%tmphash = ();
+-	foreach $tmp1 (keys %queryhash)
++	foreach $tmp1 (sort keys %queryhash)
+ 	{
+ 		print "$tmp1 -> $queryseqnum[$queryhash{$tmp1}]\n";
+ 		if (!(exists $tmphash{$queryseqnum[$queryhash{$tmp1}]}))
+@@ -145,6 +149,7 @@
+ 	{
+ 		@arr = sort{$b <=> $a}(@queryseqnum);
+ 		$i = $arr[int($querycount / 2)];
++		warn "[perl-seeds] median_count=$i (max_effort, from " . scalar(@arr) . " markers)\n";
+ 		#$i = $arr[0];
+ 		if ($i == 1)
+ 		{
+@@ -162,6 +167,7 @@
+ 	{
+ 		@arr = sort {$a <=> $b} (@queryseqnum);
+ 		$i = $arr[int($querycount / 2)];
++		warn "[perl-seeds] median_count=$i (from " . scalar(@arr) . " markers)\n";
+ 	}
+ 
+ 	# Check the number of markers
+@@ -199,7 +205,7 @@
+ 			elsif ($i == 1)
+ 			{
+ 				$j = 999999;
+-				foreach $tmp1 (keys %queryhash)
++				foreach $tmp1 (sort keys %queryhash)
+ 				{
+ 					if ($queryseqnum[$queryhash{$tmp1}] == $i && $j > $querylen[$queryhash{$tmp1}])
+ 					{
+@@ -223,7 +229,8 @@
+ 	else
+ 	{
+ 		$j = 999999;
+-		foreach $tmp1 (keys %queryhash)
++		for my $dbg_c (sort keys %queryhash) { if ($queryseqnum[$queryhash{$dbg_c}] == $i) { warn "[perl-seeds]   candidate: marker=$dbg_c query_len=$querylen[$queryhash{$dbg_c}]\n"; } }
++		foreach $tmp1 (sort keys %queryhash)
+ 		{
+ 			if ($queryseqnum[$queryhash{$tmp1}] == $i && $j > $querylen[$queryhash{$tmp1}])
+ 			{
+@@ -231,7 +238,8 @@
+ 				$current = $tmp1;
+ 			}
+ 		}
+-		#print "$current\n";
++		warn "[perl-seeds] selected marker=$current query_len=$j\n";
++		for (my $si = 0; $si < $queryseqnum[$queryhash{$current}]; $si++) { warn "[perl-seeds]   seed: $queryseq[$queryhash{$current}][$si]\n"; }
+ 
+ 		open(LOCALOUT, ">$out");
+ 		for ($i = 0; $i < $queryseqnum[$queryhash{$current}]; $i++)
+@@ -562,7 +570,7 @@
+ 	}
+ 	close(LOCALFILE);
+ 
+-	foreach $i (keys %hmmclasshash)
++	foreach $i (sort keys %hmmclasshash)
+ 	{
+ 		open(LOCALOUT, ">$out_f.$i.marker.fasta");
+ 		foreach $j (sort{$markerhash{$a} cmp $markerhash{$b}} keys %markerhash)
+@@ -691,7 +699,7 @@
+ 	}
+ 	close(LOCALFILE);
+ 
+-	foreach $i (keys %hmmclasshash)
++	foreach $i (sort keys %hmmclasshash)
+ 	{
+ 		open(LOCALOUT, ">$out_f.$i");
+ 		foreach $j (sort keys %resulthash)
+--- a/run_MaxBin.pl	2020-06-12 11:27:25.000000000 +0200
++++ b/run_MaxBin.pl	2026-04-14 23:53:06.661641776 +0200
+@@ -1,7 +1,6 @@
+ #!/usr/bin/perl -w
+ use strict;
+ use Cwd;
+-use LWP::Simple;
+ use FindBin qw($Bin);
+ 
+ my $currdir = getcwd;
+--- a/_sepReads.pl	2020-06-12 11:27:25.000000000 +0200
++++ b/_sepReads.pl	2026-04-14 23:53:06.671641728 +0200
+@@ -245,7 +245,7 @@
+ 	}
+ 
+ 	# Close all files
+-	foreach $f (keys %filehash)
++	foreach $f (sort keys %filehash)
+ 	{
+ 		close($f);
+ 	}

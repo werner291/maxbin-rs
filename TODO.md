@@ -1,15 +1,18 @@
 # maxbin-rs
 
-Rust replacement for MaxBin2, a metagenome binning tool.
+Rust replacement for MaxBin2, a metagenome binning tool developed by
+[Yu-Wei Wu, Blake A. Simmons, and Steven W. Singer](https://doi.org/10.1093/bioinformatics/btv638).
 
-MaxBin2 is popular but unmaintained (last release ~2021, SourceForge, single
-maintainer, all 13 tickets unanswered). It is a default binner in nf-core/mag.
-The nf-core/mag team flagged it as a pain point (2026-04-13 Slack conversation
-with James Fellows Yates and Jim Downie).
+MaxBin2 is widely used (default binner in nf-core/mag) and has not seen
+updates since approximately 2021. The issues cataloged below are about
+packaging, maintenance, and edge-case correctness — the underlying
+algorithm is sound and this project faithfully preserves it. Many of
+these issues are common in academic software of this age and reflect the
+lack of ongoing maintenance rather than poor original engineering.
 
-## Known complaints (with sources)
+## Known issues (with sources)
 
-### Install / dependency hell
+### Installation and dependency management
 
 - [ ] Perl `@INC` path breakage in bioconda — recurring, never permanently fixed
   [bioconda-recipes #24707](https://github.com/bioconda/bioconda-recipes/issues/24707),
@@ -22,6 +25,12 @@ with James Fellows Yates and Jim Downie).
 - [ ] C++11 compiler requirement breaks on old HPC clusters
   [SourceForge discussion](https://sourceforge.net/p/maxbin2/discussion/general/thread/7e55b8f0/)
 - [ ] External deps: Bowtie2, FragGeneScan, HMMER3, IDBA-UD, Perl 5 + CPAN, R + gplots
+- [ ] `use LWP::Simple` imported in `run_MaxBin.pl` but never used — pulls in the
+  entire libwww-perl dependency tree unnecessarily
+  (observed directly: had to patch it out to avoid pulling in HTTP::Status etc.)
+- [ ] FragGeneScan 1.30 (bundled version) doesn't compile with modern GCC — missing
+  forward declarations (`print_usage`, `get_rc_dna_indel`) are errors since GCC 14
+  (observed directly: needed `-Wno-error=implicit-function-declaration` to build)
 
 ### Performance
 
@@ -32,6 +41,17 @@ with James Fellows Yates and Jim Downie).
 - [ ] FragGeneScan initialization is slow — processes all marker genes including
   unreliable short sequences
   [metaWRAP #516](https://github.com/bxlab/metaWRAP/issues/516)
+
+### File system side effects
+
+- [ ] Creates a temporary log file (`<random_number>.log`) in the current working directory
+  at startup — writes to CWD without the user's request, which fails on read-only
+  directories and clutters shared workspaces
+  (observed directly: `run_MaxBin.pl` line ~118–126)
+- [ ] Writes temp files next to the input contig file (`$contig.fa`, etc.) —
+  fails on read-only filesystems (e.g. Nix store, network mounts).
+  nf-core works around this by copying contigs into a local `input/` directory.
+  (observed directly: fails with "Read-only file system" when contig is in `/nix/store`)
 
 ### Crashes
 
@@ -54,6 +74,11 @@ with James Fellows Yates and Jim Downie).
 ### Correctness
 
 - [ ] `prob_threshold` default mismatch: help says 0.9, code uses 0.5
+- [ ] AbundanceLoader separator-skipping loop uses `&&` instead of `||` (line 110) —
+  a char can't equal `\t` AND ` ` AND `,` AND `;` simultaneously, so multiple
+  consecutive separators are never skipped. Harmless in practice since abundance
+  files typically use a single tab, but would misparse files with e.g. `\t\t`.
+  (observed directly in `AbundanceLoader.cpp`)
   [SourceForge ticket #7](https://sourceforge.net/p/maxbin2/tickets/7/)
 - [ ] Same contigs in multiple bins
   [SourceForge ticket #10](https://sourceforge.net/p/maxbin2/tickets/10/)
@@ -80,9 +105,27 @@ with James Fellows Yates and Jim Downie).
    Can't rewrite what you can't verify.
 3. **Rust core** — replace the C++ EM algorithm. Eliminate segfaults, fix parsing bugs,
    proper error handling.
-4. **Kill Perl** — replace orchestration scripts with Rust CLI. Eliminate the entire class
-   of `@INC` / `readline()` / path resolution bugs.
+   - **Done**: The E-step abundance probability computation is now parallelized over
+     abundance files using Rayon, matching the C++ `ThreadPool` + `threadfunc_E` behavior.
+     Controlled by the `-thread` flag (via `EmParams::thread_num`). Output is bit-for-bit
+     identical to the sequential version (the per-file computations are independent).
+   - **Future**: Parallelize the *outer* contig loop (which the C++ does NOT do).
+     This is where the real speedup is — 25K contigs × 10 bins = 250K independent
+     distance computations per EM iteration, embarrassingly parallel with Rayon.
+4. **Replace Perl orchestration** — rewrite the orchestration scripts in Rust. Eliminates
+   the entire class of `@INC` / `readline()` / path resolution bugs.
 5. **Adopt maxbin2_custom approach** — Prodigal instead of FragGeneScan, GTDB markers.
+   - FragGeneScan is optimized for short reads but MaxBin2 feeds it assembled contigs —
+     a mismatch that Prodigal handles better for this use case. Prodigal is faster,
+     better at gene boundary prediction on contigs, and actively maintained.
+   - Implement as a CLI option (e.g. `--gene-caller prodigal|fraggenescan`) so users
+     can switch. Default to Prodigal, keep FragGeneScan for backwards compatibility.
+   - When shelling out to external tools (HMMER, Bowtie2, gene caller), add comments
+     citing the known issues: FragGeneScan segfaults (ticket #2), gene calling on
+     assembled contigs is a misuse of FGS, and the `setting` file path resolution
+     mess. These are the problems the rewrite eliminates.
+   - Bug fixes (prob_threshold default, separator parsing, etc.) are out of scope for
+     the initial rewrite — equivalence first, fixes as separate tracked changes.
 6. **nf-core/mag module** — drop-in replacement.
 
 ## Algorithm summary

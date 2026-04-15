@@ -1,0 +1,21 @@
+[package]
+name = "maxbin-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+flate2 = "1.1.9"
+rayon = "1.10"
+
+[build-dependencies]
+cc = "1.2.60"
+
+[dev-dependencies]
+proptest = "1.11.0"
+tempfile = "3"
+
+# Optimized test profile for benchmarks.
+# Usage: cargo nextest run --cargo-profile bench bench_components -- --ignored
+[profile.bench]
+inherits = "release"
+debug = true  # keep symbols for profiling

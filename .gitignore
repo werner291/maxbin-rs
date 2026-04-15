@@ -1,0 +1,6 @@
+/target
+/.direnv
+/result
+
+# MaxBin2 drops temp log files with random numeric names in cwd
+[0-9]*.log
