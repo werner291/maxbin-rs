@@ -16,7 +16,7 @@ For a detailed account of how this rewrite was done and verified, see
 
 **Status:** Pipeline stage equivalence verified on four datasets (B. fragilis,
 minigut, CAPES_S7, CAMI I High). Component-level equivalence verified via
-proptest + FFI against the original C++ (107 tests). See [Verifying the claims](#verifying-the-claims)
+proptest + FFI against the original C++ (109 tests). See [Verifying the claims](#verifying-the-claims)
 below.
 
 ## Quick start
@@ -60,7 +60,7 @@ Here is how to check, in order of increasing time commitment:
 ### 1. Component-level tests (~1 minute)
 
 Proptest-based equivalence: each Rust function is tested against the original
-C++ via FFI on randomized inputs. 107 tests covering all major components.
+C++ via FFI on randomized inputs. 109 tests covering all major components.
 
 ```bash
 nix develop

@@ -72,7 +72,6 @@ in {
   # The standard metagenome binning benchmark. 39,140 contigs, 2.80 Gbp.
   # Sczyrba et al., Nature Methods 2017, doi:10.1038/nmeth.4458
   # Pre-computed abundance depth file available; no raw reads needed.
-  # TODO: hashes need to be filled in on first build (nix will report the correct hash).
   cami-i-high = {
     contigs = fetchurl {
       url = "https://portal.nersc.gov/dna/RD/Metagenome_RD/MetaBAT/Files/CAMI/CAMI_high_GoldStandardAssembly.fasta.gz";
@@ -89,7 +88,6 @@ in {
   # Confirmed MaxBin v1 runtime: 3h 24min on 32 threads.
   # Kang et al., PeerJ 2015, doi:10.7717/peerj.1165
   # Pre-computed MaxBin-format depth file available.
-  # TODO: hashes need to be filled in on first build.
   metahit = {
     contigs = fetchurl {
       url = "https://portal.nersc.gov/dna/RD/Metagenome_RD/MetaBAT/Files/MetaHIT/assembly.fa.gz";

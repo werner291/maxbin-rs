@@ -137,16 +137,39 @@ fn main() {
     }
 
     // Step 5: Compile everything into a static library.
+    // Optional: unity build — compile all C++ into one translation unit.
+    // This simulates what LTO would achieve (cross-function inlining) without
+    // requiring toolchain support for cross-language LTO.
+    // Set MAXBIN2_CPP_LTO=1 to enable.
+    println!("cargo:rerun-if-env-changed=MAXBIN2_CPP_LTO");
+    let unity = env::var("MAXBIN2_CPP_LTO").as_deref() == Ok("1");
+
     let mut build = cc::Build::new();
     build.cpp(true).std("c++11").warnings(false).include(&cpp_dir);
 
-    for file in UPSTREAM_CPP {
-        if file.ends_with(".cpp") {
-            build.file(cpp_dir.join(file));
+    if unity {
+        eprintln!("build.rs: unity build enabled (all C++ in one translation unit)");
+        let unity_path = cpp_dir.join("unity.cpp");
+        let mut contents = String::new();
+        for file in UPSTREAM_CPP {
+            if file.ends_with(".cpp") {
+                contents.push_str(&format!("#include \"{}\"\n", file));
+            }
         }
-    }
-    for wrapper in FFI_WRAPPERS {
-        build.file(cpp_dir.join(wrapper));
+        for wrapper in FFI_WRAPPERS {
+            contents.push_str(&format!("#include \"{}\"\n", wrapper));
+        }
+        fs::write(&unity_path, &contents).expect("failed to write unity.cpp");
+        build.file(&unity_path);
+    } else {
+        for file in UPSTREAM_CPP {
+            if file.ends_with(".cpp") {
+                build.file(cpp_dir.join(file));
+            }
+        }
+        for wrapper in FFI_WRAPPERS {
+            build.file(cpp_dir.join(wrapper));
+        }
     }
 
     build.compile("maxbin2_ffi");

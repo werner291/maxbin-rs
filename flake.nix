@@ -19,6 +19,7 @@
 #   nix run .#test-pipeline-stages-capes    — run CAPES_S7 stage tests
 #   nix run .#test-pipeline-stages-cami     — run CAMI I High stage tests
 #   nix run .#test-pipeline-stages-metahit  — run MetaHIT stage tests
+#   nix build .#disasm-em                   — disassemble EM hot functions
 #   nix develop                             — enter development shell
 
 {
@@ -89,6 +90,22 @@
           nativeBuildInputs = [ pkgs.makeWrapper ];
         };
 
+        # Same as maxbin-rs but with C++ LTO enabled for the FFI library.
+        # Used for A/B benchmarking to test whether -flto closes the ~8x gap.
+        maxbin-rs-lto = pkgs.rustPlatform.buildRustPackage {
+          pname = "maxbin-rs-lto";
+          version = "0.1.0";
+          src = ./.;
+          cargoHash = "sha256-5KrBRpVM8yM8QViX0/G/IjmFpankZL8AeCTD+pTf/zw=";
+          MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
+          MAXBIN2_CPP_LTO = "1";
+          postInstall = ''
+            wrapProgram $out/bin/maxbin-rs \
+              --prefix PATH : "${pkgs.lib.makeBinPath [ pkgs.hmmer pkgs.bowtie2 ]}:${fraggenescan}/libexec/FragGeneScan"
+          '';
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+        };
+
         # =====================================================================
         # Test data and pre-computed intermediates
         # =====================================================================
@@ -142,8 +159,8 @@
         # =====================================================================
 
         tests = import ./nix/tests.nix {
-          inherit (pkgs) writeShellApplication;
-          inherit maxbin2 maxbin-rs rust;
+          inherit (pkgs) writeShellApplication runCommand binutils-unwrapped;
+          inherit maxbin2 maxbin-rs maxbin-rs-lto rust;
           inherit (pkgs) cargo-nextest;
           inherit datasets intermediates;
         };
@@ -158,7 +175,8 @@
           inherit (tests)
             test-pipeline-stages test-pipeline-stages-minigut
             test-pipeline-stages-capes test-pipeline-stages-cami
-            test-pipeline-stages-metahit bench-components;
+            test-pipeline-stages-metahit bench-components bench-cpp-lto
+            disasm-em;
         };
 
         # `nix develop` drops you into this shell with all tools available.

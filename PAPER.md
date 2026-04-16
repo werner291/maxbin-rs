@@ -171,10 +171,10 @@ the spectrum: [Nix](https://nixos.org/), a build system that aspires to
 make every build perfectly deterministic and reproducible. On the other
 end: an LLM, which is by nature stochastic and produces different output
 on every run. These are not contradictory — they are complementary. Nix
-provides the deterministic floor that makes it (relatively) safe to use 
+provides the deterministic floor that makes it (relatively) safe to use
 an inherently unpredictable code generator.
 
-**[Rust](https://www.rust-lang.org/).** Chosen for memory safety, strong
+[Rust](https://www.rust-lang.org/). Chosen for memory safety, strong
 typing, and good C FFI — the last point critical for calling original C++
 functions directly from test code. (Rust's ecosystem also makes
 improvements easy — e.g. replacing the original's C++ thread pool with
@@ -183,7 +183,8 @@ one-line iterator change, safe by construction. The outer contig loop —
 the bigger optimization opportunity — remains single-threaded in both
 implementations, waiting until equivalence is fully proven.)
 
-**[Nix](https://nixos.org/)** ([Dolstra et al., 2004](https://edolstra.github.io/pubs/nspfssd-lisa2004-final.pdf))**.**
+[Nix](https://nixos.org/)
+([Dolstra et al., 2004](https://edolstra.github.io/pubs/nspfssd-lisa2004-final.pdf)).
 Packaging, reproducibility, and testing. The entire dependency graph —
 Rust toolchain, HMMER, Bowtie2, FragGeneScan, the original MaxBin2, and
 test datasets — is built from source with pinned inputs. Anyone with Nix
@@ -193,17 +194,18 @@ drifts, hashes change and the tests catch it. Nix also packages the original
 MaxBin2, which was itself nontrivial (FragGeneScan doesn't compile with
 modern GCC without patches, the Perl script imports unused modules, etc.).
 
-**Claude (Anthropic).** Opus 4.6 for most code and prose, Sonnet for
-web searches. The use of LLMs is controversial — the environmental costs are real,
-and the economic and creative disruption is not hypothetical. This rewrite would not have happened without one —
-the manual effort would have been at least an order of magnitude larger.
+[Claude™](https://claude.ai/) (Anthropic). Opus 4.6 for most code and
+prose, Sonnet for web searches. The use of LLMs is controversial — the
+environmental costs are real, and the economic and creative disruption is
+not hypothetical. This rewrite would not have happened without one — the
+manual effort would have been at least an order of magnitude larger.
 
-To mitigate LLM confirmation bias (see Discussion), I used subagents
+To mitigate LLM confirmation bias (see [Discussion](#discussion)), I used subagents
 with fresh context for self-review — both for code and for this paper
 (see [docs/code-review-prompts.md](docs/code-review-prompts.md) and
 [docs/review-prompts.md](docs/review-prompts.md)).
 
-**[proptest](https://github.com/proptest-rs/proptest).** Property-based
+[Proptest](https://github.com/proptest-rs/proptest). Property-based
 testing framework for Rust. Each Rust function is tested against the
 original C++ via FFI on randomized inputs, checking that both produce
 identical output across thousands of cases.
@@ -217,14 +219,15 @@ wrong value for a degenerate input, the Rust reimplementation computes
 the same wrong value, and a test verifies this. Bug fixes come later as
 separate, documented changes.
 
-This is the [rewrites.bio](https://rewrites.bio) approach, and it is
-what made the project tractable. With an oracle (the original C++ and
+This follows from [rewrites.bio](https://rewrites.bio)'s "emulate
+exactly" principle (2.2), and it is what made the project tractable. With an oracle (the original C++ and
 Perl, callable via FFI and Nix), every function has a testable answer.
 
-I test at two layers.
+I test at two levels.
 
-**Layer 1: Component-level proptest.**
-[build.rs](build.rs) compiles the original C++ into a static library,
+#### Component-level
+
+The build script ([build.rs](build.rs)) compiles the original C++ into a static library,
 and [src/original_ffi.rs](src/original_ffi.rs) exposes it to Rust via
 FFI. The [proptest](https://github.com/proptest-rs/proptest) framework
 then generates random inputs, feeds them to both the Rust function and
@@ -232,16 +235,18 @@ the C++ function, and asserts identical output. 99 tests cover all major
 components: FASTA parsing, abundance loading, kmer frequencies, distance
 metrics, EM probability functions, profiling, normal distribution, and
 quicksort. This layer caught real divergences: C's `atof` skips leading
-whitespace while Rust's `parse::<f64>()` does not, and the original
-computes a wrong `percent_N` for sequences shorter than the kmer length.
+whitespace while Rust's `parse::<f64>()` does not, and the original C++
+computes a nonsensical `percent_N` (NaN or -0.0) for sequences shorter
+than the kmer length due to signed integer underflow.
 Both are now reproduced exactly. (See [tests/proptest_*.rs](tests/).)
 
-**Layer 2: Pipeline stage tests.**
+#### Pipeline-level
+
 The MaxBin2 pipeline has four stages: contig filtering, read mapping +
 abundance, marker gene detection + seed selection, and EM binning.
 Intermediate data (SAM alignments, HMMER output, abundance tables, seed
 files) is produced by running the original MaxBin2 once per dataset,
-cached as a Nix derivation — the slow Bowtie2 and HMMER runs happen
+cached as a Nix derivation ([nix/intermediates.nix](nix/intermediates.nix)) — the slow Bowtie2 and HMMER runs happen
 once and are never repeated (both implementations call the same external
 tools, so their output is identical). Each stage is then tested by feeding the
 original's intermediate output to the Rust reimplementation and checking
@@ -261,75 +266,25 @@ but not yet run:
 - **minigut** — nf-core/mag test profile, multi-organism.
 - **CAPES_S7** — 25,244 contigs, ~2.5 GB reads from ENA.
 - **CAMI I High** — 36,116 contigs, 577 bins. From the
-  [CAMI challenge](https://doi.org/10.1038/nmeth.4458) (Sczyrba et al., 2017).
+  [CAMI challenge](https://doi.org/10.1038/nmeth.4458) ([Sczyrba et al., 2017](https://doi.org/10.1038/nmeth.4458)).
 
-### Nondeterminism
-
-The original MaxBin2 is nondeterministic. Perl 5.18+ randomizes hash
-key iteration order for security, and `_getmarker.pl` iterates marker
+A caveat: the original MaxBin2 is nondeterministic. Perl 5.18+
+randomizes hash key iteration order, and `_getmarker.pl` iterates marker
 gene clusters with `keys %hash`. This means the seed ordering — and
-therefore the EM initialization, and therefore the final bins — can
-differ between runs of the original itself. MaxBin2 uses an
-Expectation-Maximization algorithm
-([Dempster et al., 1977](https://doi.org/10.1111/j.2517-6161.1977.tb01600.x)),
-which is known to converge to local optima depending on initialization.
-In practice, this nondeterminism is unlikely to be a problem in real
-pipelines — the bins will be broadly similar across runs. But it makes
-byte-level equivalence verification between two implementations
-difficult, because there is no single "correct" output to compare
-against.
+therefore the EM convergence point — can differ between runs of the
+original itself. I patch the original Perl to sort seeds alphabetically
+for testing (`sort keys %hash` — see
+[nix/maxbin2-deterministic.patch](nix/maxbin2-deterministic.patch)),
+and maxbin-rs does the same when `MAXBIN_RS_DETERMINISTIC=1` is set.
+There are further sources of nondeterminism and a float precision
+difference (`long double` vs `f64`) that I expand on in the [Discussion](#nondeterminism-and-float-precision).
 
-I preserve this behavior: by default, maxbin-rs shuffles seeds randomly
-at startup. Setting `MAXBIN_RS_DETERMINISTIC=1` sorts seeds
-alphabetically instead, and the equivalence tests patch the original
-Perl to do the same (`sort keys %hash` — see
-[nix/maxbin2-deterministic.patch](nix/maxbin2-deterministic.patch)).
+### Source Traceability
 
-This is not the only source of nondeterminism in the stack. Rust's
-`HashMap` uses SipHash seeded from a cryptographic RNG by default — not
-the vaguely-defined iteration order that programmers have historically
-been warned not to rely on, but an *intentional* randomization with a
-strong guarantee of unpredictability, added to prevent hash-flooding DoS attacks
-([Klink and Wälde, 28C3 2011](https://events.ccc.de/congress/2011/Fahrplan/events/4680.en.html);
-[CVE-2011-4885](https://nvd.nist.gov/vuln/detail/CVE-2011-4885)). Bowtie2 and HMMER are threaded and may have their own internal
-ordering dependencies. Float formatting differs subtly between C, Perl,
-and Rust. The challenges of deterministic software are shifting: where
-the old problem was accidentally relying on unspecified iteration order,
-the new problem is that languages actively prevent you from doing so.
-
-This is why I test at pipeline stage interfaces rather than comparing
-final end-to-end output. Naive end-to-end comparison across
-reimplementations is fundamentally unreliable when the stack is not
-deterministic top to bottom.
-
-A further reproducibility caveat: the original C++ uses `long double`
-for all EM probability computations (81 uses across EManager.cpp). The
-Rust reimplementation uses `f64`. These are not the same type — and
-`long double` is not even the same type across platforms. On x86-64
-Linux it is 80-bit x87 extended precision
-([System V AMD64 ABI](https://www.uclibc.org/docs/psABI-x86_64.pdf));
-on ARM64 Linux it is 128-bit IEEE quad
-([AAPCS64](https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst));
-on macOS Apple Silicon and Windows (MSVC) it is 64-bit, identical to
-`double`
-([Microsoft docs](https://learn.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp)).
-The C++ standard requires only that `long double` is at least as
-precise as `double` — it does not specify the format.
-
-This means the original MaxBin2 computes with different intermediate
-precision depending on the platform it is compiled on. The bin
-assignments (which contig ends up in which bin) appear to be robust to
-this — the argmax of the probability vector is the same regardless of
-whether the probabilities are computed in 64, 80, or 128 bits. The
-Rust reimplementation's use of `f64` is actually more portable: it is
-the same 64-bit IEEE 754 format on every platform. The equivalence
-tests verify that bin assignments match despite the precision
-difference.
-
-In addition to automated testing, the Rust code is annotated with
+The Rust code is annotated with
 comments mapping to the original source (e.g. "Matches
 kmerMap.cpp:219-244" throughout [src/kmer_map.rs](src/kmer_map.rs), and
-"Matches run_MaxBin.pl:~NNN" in [src/pipeline.rs](src/pipeline.rs)),
+"Matches run_MaxBin.pl:366" in [src/pipeline.rs](src/pipeline.rs)),
 allowing a reviewer to verify structural correspondence by reading both
 implementations side by side.
 
@@ -344,17 +299,29 @@ so every change from the original is auditable.
 
 ### Equivalence
 
-All pipeline stage tests pass on all four tested datasets. At the component
-level, 99 tests pass — proptest equivalence, inline FFI tests, and CLI
-parsing tests, each comparing a Rust
-function against the original C++ via FFI on randomized inputs.
+All pipeline stage tests pass on all four tested datasets (B. fragilis,
+minigut, CAPES_S7, CAMI I High). At the component level, 109 tests
+pass — proptest equivalence, inline FFI tests, and CLI parsing tests.
+
+To reproduce:
+
+```bash
+# Component-level tests (~1 min)
+nix develop -c cargo nextest run
+
+# Pipeline stage tests per dataset
+nix run .#test-pipeline-stages         # B. fragilis (~1 min)
+nix run .#test-pipeline-stages-minigut # minigut (~2 min)
+nix run .#test-pipeline-stages-capes   # CAPES_S7 (~10 min)
+nix run .#test-pipeline-stages-cami    # CAMI I High (~50 min)
+```
 
 The pipeline stage tests verify:
 
 | Stage | What is compared | Result |
 |---|---|---|
 | Contig filtering | tooshort reject file | Byte-identical |
-| SAM → abundance | Per-contig depth values | Bit-exact (max diff < 1e-15) |
+| SAM → abundance | Per-contig depth values | Within tolerance (max diff < 1e-15) |
 | HMM → seeds | Seed contig names | Identical as sets |
 | EM binning | Bin FASTA files, noclass, tooshort | Byte-identical |
 
@@ -364,42 +331,24 @@ verifies that the algorithm implementation matches, but does not test
 the Perl orchestration layer end-to-end. The earlier stages (filtering,
 abundance, seeds) cover the orchestration logic independently.
 
-These results hold across B. fragilis (~1 MB, 38 contigs as counted
-from the test data), minigut (multi-organism, ~10 MB), CAPES_S7
-(25,244 contigs, ~2.5 GB reads), and CAMI I High (36,863 filtered
-contigs, 577 seeds, 240 bins — the standard metagenome binning
-benchmark from [Sczyrba et al., 2017](https://doi.org/10.1038/nmeth.4458)).
-Real-world metagenomics datasets can be substantially larger still —
-broader testing is needed.
+CAMI I High is the largest dataset tested (36,863 filtered contigs,
+577 seeds, 240 bins). Real-world metagenomics datasets can be
+substantially larger — broader testing is needed.
 
-### Bugs Found in the Original
+The equivalence testing process uncovered several bugs in the original,
+most harmless in practice. The most user-visible is a `prob_threshold`
+default mismatch (help says 0.9, code uses 0.5). All are reproduced in
+the reimplementation and documented in [TODO.md](TODO.md) for later
+fixing. The reimplementation is approximately 4,400 lines of Rust
+across 14 source files, with 1,500 lines of test code (the original is
+roughly 2,500 lines of C++ and 1,500 lines of Perl).
 
-The equivalence testing process uncovered several bugs in the original.
-All are reproduced in the reimplementation and documented for later
-fixing.
-
-| Bug | Location | Practical impact |
-|---|---|---|
-| `prob_threshold` default mismatch | run_MaxBin.pl | **Affects users**: help says 0.9, code uses 0.5 |
-| `&&` instead of `\|\|` in separator skip | AbundanceLoader.cpp:115 | Harmless in practice — single-separator files are the norm ([ticket #7](https://sourceforge.net/p/maxbin2/tickets/7/)) |
-| `atof` whitespace interaction | AbundanceLoader.cpp | Harmless — interacts with the above bug; C's `atof` tolerates the leftover whitespace |
-| `isMark` no-op | EManager.cpp:404 | Harmless — `== false` instead of `= false`, comparison discarded |
-| Off-by-one in marker output | _getmarker.pl:~392 | Cosmetic — extra trailing tab per row in marker file |
-| `percent_N` on short sequences | Profiler.cpp | Never triggers — masked by minimum contig length filter |
-
-### Codebase Size
-
-The reimplementation is approximately 4,400 lines of Rust across 14
-source files, with 1,500 lines of test code. The original is roughly
-2,500 lines of C++ and 1,500 lines of Perl.
-
-### CLI Coverage
-
-The equivalence tests exercise single-reads and multi-reads input modes.
-Several CLI options remain untested: `-reads_list`, `-abund_list`,
-`-plotmarker`, and non-default `-markerset` choices. Notably,
-`-reads_list` (providing multiple sample files via a list) is common in
-real multi-sample co-assembly workflows. This is a significant gap.
+CLI argument parsing is tested for `-reads_list`, `-abund_list`,
+`-min_contig_length`, `-markerset`, and double-dash normalization
+(see [tests/cli_list_files.rs](tests/cli_list_files.rs)). However,
+the pipeline stage tests only exercise single-reads and pre-computed
+abundance input modes on real data. End-to-end testing with
+`-reads_list` on a multi-sample dataset has not been done.
 
 ### Performance
 
@@ -415,202 +364,183 @@ suggesting a performance issue rather than a correctness one.
 
 **EM algorithm on CAMI I High** (36,863 contigs, 577 bins, 50
 iterations). All measurements on a Framework 16 laptop (AMD Ryzen 9
-7940HS, Zen 4, 60 GB RAM) running NixOS 26.05. Single run each, though
-the result was consistent across several trial runs during development.
+7940HS, Zen 4, 60 GB RAM) running NixOS 26.05. Observed across multiple runs during development — C++ EM
+iterations consistently take 30–40s each; Rust completes the full 50
+iterations in under 5 minutes.
 Reproducible via `nix run .#test-pipeline-stages-cami`.
 
 Early measurements were confounded by IO overhead: the Rust code had
 unbuffered file writes (since fixed), and the C++ had `sprintf` with
 `%Lf` formatting inside the innermost loop — per contig, per seed,
-per iteration — plus per-call file write and flush in the logger. After
+per iteration — plus per-call file write and flush in the logger
+(see [nix/maxbin2-cpp-ffi.patch](nix/maxbin2-cpp-ffi.patch)). After
 stripping all logging and IO from both sides (both compiled at `-O3`,
 timing via `clock_gettime` on the C++ side and `std::time::Instant`
 on the Rust side):
 
 | Implementation | EM loop | classify | write | total |
 |---|---|---|---|---|
-| C++ with `long double` (original) | ~2200s | ~0s | ~4s | ~37 min |
-| C++ with `double` (experiment) | 1886s | 0s | 4s | ~33 min |
-| Rust with `f64` | 231s | — | — | ~3.9 min |
+| C++ with `long double` (original) | ~2200s | <1s | ~4s | ~37 min |
+| C++ with `double` (experiment) | 1886s | <1s | ~4s | ~31 min |
+| Rust with `f64` | 231s | <1s | <1s | ~3.9 min |
 
-The C++ uses `long double` (80-bit x87 on this platform — see the
-[precision discussion above](#nondeterminism)) while Rust uses `f64`
-(64-bit IEEE 754). Patching the C++ to use `double` throughout reduced
-the EM loop from ~2200s to 1886s (~15%), but the Rust EM at 231s is
-still 8.2x faster than the C++ `double` variant. Bin assignments were
-identical across all three — the extra precision was never needed.
+The C++ uses `long double` (80-bit x87 on this platform) while Rust
+uses `f64` (64-bit IEEE 754). Bin assignments were identical across all
+tested datasets despite the precision difference.
 
-I am suspicious of this result — an 8x speedup on the same algorithm
-feels too large to be real. But repeated attempts to close the gap
-(removing IO overhead, switching C++ to `double`, stripping all
-logging) have not invalidated it. I do not know why the gap exists. Possible contributing factors
-include cross-compilation-unit function calls in the C++ (the EM inner
+I did not expect an ~8x gap and spent considerable effort trying to
+close it from the C++ side. I stripped all `sprintf` and logging calls
+from the inner loop
+([nix/maxbin2-cpp-ffi.patch](nix/maxbin2-cpp-ffi.patch)), switched
+from `long double` to `double`
+([nix/maxbin2-cpp-ffi-f64.patch](nix/maxbin2-cpp-ffi-f64.patch)) —
+~15% improvement. I suspected the remaining gap was due to
+cross-compilation-unit calls preventing inlining — the C++ EM inner
 loop calls into `EucDist.cpp`, `Profiler.cpp`, and `fastaReader.cpp`,
-which without link-time optimization prevents inlining and
-vectorization), and the use of `double**` pointer-to-pointer arrays
-(non-contiguous, not provably non-aliasing). Rust compiles the entire
-crate as one LLVM module and uses contiguous arrays. Comparing the
-generated assembly of the EM inner loop on both sides would confirm
-or refute these hypotheses.
+which GCC cannot inline across separate `.cpp` files without link-time
+optimization. To test this, I compiled all C++ into a single translation
+unit (unity build). It made no difference.
 
-The `long double` → `double` experiment is preserved as a research
-artifact ([nix/maxbin2-cpp-ffi-f64.patch](nix/maxbin2-cpp-ffi-f64.patch)).
+Disassembly of both sides (`objdump -d`, reproducible via
+`nix build .#disasm-em`) explains why: neither is vectorized, but the
+C++ `run_EM` makes 38 function calls — `malloc`/`free`, non-inlined
+helpers, even calls to logging functions whose bodies are empty — while
+Rust's `run_em` makes 39 calls over 990 instructions because LLVM
+inlined the helpers into the function body. GCC does not eliminate the
+empty-body calls even in the unity build. Closing the gap would require
+rewriting the C++ inner loop, not changing compiler flags.
 
-**End-to-end performance** has not been benchmarked. On real pipelines,
-external tool calls (Bowtie2, HMMER, FragGeneScan) contribute
-significant runtime alongside the EM. On CAMI I High, the EM alone
-takes ~37 minutes in C++ — substantial enough that the 9x Rust speedup
-would be visible in end-to-end wall time.
+The EM is one stage of the pipeline — Bowtie2, HMMER, and FragGeneScan
+also contribute runtime. The ~8x EM speedup does not translate to ~8x
+end-to-end, but ~37 minutes of C++ EM time is not negligible.
 
 ## Discussion
 
-The rewrites.bio equivalence-first principle is what made this project
-possible. "Correct means same output as the original" gives you an
-oracle for every function — no ambiguity, no design decisions about what
-"better" means, just match the output and move on. The entire project took approximately two days of part-time work. This
-is simultaneously alarming and the point: the algorithm is verified
-identical at the component level, so there is no reason it should not
-scale — but I cannot make that claim concrete without testing on
-larger datasets. Domain knowledge was not the bottleneck — engineering
-effort was, and LLMs reduced it enough to make a side project viable.
+The rewrites.bio equivalence-first principle made the project tractable.
+"Correct means same output as the original" gives you an oracle for
+every function — no ambiguity, no design decisions about what "better"
+means, just match the output and move on.
 
-### What worked
+The initial reimplementation took approximately two days of part-time
+work — the EM core, the largest component, reached equivalence on the
+first day. Testing on larger datasets, investigating the performance
+results, and writing this paper took considerably longer.
+
+### Methodology
 
 The combination of an equivalence target, proptest, and C++ FFI meant
 that every function had a testable answer from the start. Nix eliminated
 "works on my machine" problems entirely — the original MaxBin2, its
 dependencies, the test data, and the equivalence tests are all
-reproducible from a single configuration. The LLM was productive at
-mechanical translation (reading C++ or Perl and producing equivalent
-Rust), systematic source annotation, and generating test scaffolding.
+reproducible from a single configuration.
 
-### Was a rewrite necessary?
-
-In hindsight, many of the improvements in this project did not require
-a rewrite. The Perl could be patched for deterministic hash iteration.
-The `sprintf` calls choking the C++ EM inner loop could be removed.
-Buffered I/O could be added. A Nix flake could package the original
-with all its dependencies. The `setting` file could be replaced with
-`$PATH` lookup. The unused `LWP::Simple` import could be deleted.
-These are straightforward edits to the existing Perl and C++. There is
-nothing wrong with those languages for this purpose — they just need
-maintenance.
-
+In hindsight, many of the improvements did not require a rewrite —
+buffered IO, Nix packaging, removing unused imports — these are
+straightforward patches to the existing code.
 The case for a Rust rewrite is weaker than "rewrite it in Rust" memes
-suggest. The practical improvements come from engineering decisions
-(buffered IO, removing debug logging from hot loops, Nix packaging),
-not from the language. The Rust-specific benefits — memory safety,
-Rayon for parallelism, Cargo for dependencies — are real but forward-
-looking. They make the code easier to maintain and extend, but they
-did not produce the performance gains observed in testing. Those came
-from fixing IO patterns that any language could fix.
+suggest. Whether a rewrite is justified over direct maintenance is a
+judgment call. This project exists because an LLM made the rewrite
+cheap enough to attempt as a side project. If the manual effort had
+been the full cost, patching the original would likely have been the
+better investment.
 
-Whether a rewrite is justified over direct maintenance of the original
-is a judgment call. This project exists because an LLM made the
-rewrite cheap enough to attempt as a side project. If the manual
-effort had been the full cost, patching the original would likely have
-been the better investment.
+### Technical surprises
 
-### What was hard
+None of the difficult parts were where I expected them. The algorithm
+was straightforward to translate. The biology never came up.
 
-Matching C's `%.15g` float formatting in Rust was surprisingly painful —
-Rust has no built-in equivalent, so I wrote a custom formatter. The
-nondeterminism discovery took significant debugging time: I spent hours
-assuming my code was wrong before realizing the *original* produces
-different output on every run. And the LLM has a persistent urge to
-"improve" things — constant pressure to fix bugs rather than reproduce
-them, which had to be repeatedly redirected.
+The nondeterminism in seed ordering (see [Method](#equivalence-testing))
+cost hours of debugging before I realized both implementations were
+correct, just differently ordered. Nondeterminism is pervasive in the
+stack — both Perl (since 5.18) and Rust randomize the iteration order
+of their standard dictionary types (`%hash`, `HashMap`) to prevent
+hash-flooding DoS attacks
+([Klink and Wälde, 28C3 2011](https://events.ccc.de/congress/2011/Fahrplan/events/4680.en.html)),
+and threaded tools like Bowtie2 and HMMER may have their own ordering
+dependencies. This is why I
+test at pipeline stage interfaces rather than end-to-end.
 
-### LLM pitfalls
+Matching C's `%.15g` float formatting in Rust was attempted but
+ultimately abandoned — no built-in equivalent exists, and the effort
+was disproportionate. The equivalence tests accept floating-point
+tolerance instead.
 
-LLMs write tests that do not test what they claim to. Early in the
-project, I had tautological tests that compared a function's output to
-a reimplementation of the same formula — providing zero confidence. The
-equivalence target largely solves this: it is hard to write a
-tautological test when the oracle is a separate C++ binary called via
-FFI. The test rigor still has to come from the human, but the
-architecture makes it harder to cheat.
+A separate issue: the original C++ uses `long double` for all EM
+probability computations. `long double` is not the same type across
+platforms — 80-bit on x86-64 Linux
+([System V AMD64 ABI](https://www.uclibc.org/docs/psABI-x86_64.pdf)),
+128-bit on ARM64 Linux
+([AAPCS64](https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst)),
+64-bit on macOS Apple Silicon and Windows
+([Microsoft docs](https://learn.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp)).
+Rust has no `long double` equivalent — `f64` (64-bit IEEE 754) is the
+widest float type on stable Rust
+([`f128` exists on nightly](https://github.com/rust-lang/rust/issues/116909)
+but is not yet stable). Bin assignments are identical despite the
+precision difference — the equivalence tests verify this.
 
-LLMs also exhibit strong confirmation bias. They will agree that broken
-code works if you present it confidently. Using subagents with fresh
-context for review — a separate LLM invocation that sees only the code,
-not the conversation that produced it — helped, but is not a substitute
-for testing. The human's role throughout was direction, skepticism, and
-knowing when to say "no."
+### Working with LLMs
 
-A subtler pitfall: LLM reviewer agents are sensitive to prompt framing.
-An adversarial prompt ("you are annoyed at being asked to review this")
-finds overclaims; a neutral prompt ("give your honest first
-impressions") finds the same gaps but frames them as fixable. A second-
-pass prompt ("check if these fixes worked") risks rubber-stamping — the
-agent is primed to confirm rather than re-examine. This paper was
-reviewed by LLM agents using both framings
-([docs/review-prompts.md](docs/review-prompts.md)), and the difference
-in output was significant enough to note.
+The LLM was productive at mechanical translation (C++ or Perl to
+equivalent Rust), source annotation, and test scaffolding. The failure
+modes were predictable: tautological tests (comparing output to a
+reimplementation of the same formula), confirmation bias (agreeing that
+broken code works if presented confidently), and a persistent urge to
+"improve" things rather than reproduce them. The equivalence target
+mitigates the first — it is hard to write a tautological test when the
+oracle is a separate C++ binary called via FFI. Fresh-context subagents
+help with the second. The third required constant redirection.
 
-A limitation of LLM-assisted development is that the human author has
-not read every line of the generated code with the same depth as someone
-who wrote it by hand. The original MaxBin2 authors *wrote* their code —
-they understand it in a way I do not and cannot claim to. The FFI
-equivalence tests provide mechanical verification that the output
-matches, but they do not guarantee that I understand *why* it matches.
-This is a real tradeoff, not one that testing alone can resolve.
+LLM reviewer agents are sensitive to prompt framing — adversarial
+prompts find overclaims, neutral prompts find the same gaps but frame
+them as fixable. This paper was reviewed using multiple framings
+([docs/review-prompts.md](docs/review-prompts.md)). More fundamentally,
+I have not read every line of the generated code with the depth of
+someone who wrote it by hand. The original MaxBin2 authors *wrote*
+their code — they understand it in a way I cannot claim to. The FFI
+equivalence tests verify that output matches, but not that I understand
+*why* it matches.
 
 ### Limitations
 
 This work has been tested on four datasets (up to 36K contigs), with one
 larger benchmark (MetaHIT, 60K contigs) declared but not yet run. I do
-not know how well it
-generalizes to larger or more complex metagenomes. It has not been tested
-in a real pipeline (nf-core/mag). It still shells out to HMMER, Bowtie2,
-and FragGeneScan (which itself still requires Perl). No domain expert
-has reviewed the reimplementation. Bin quality has not been assessed
-with tools like CheckM or BUSCO — the equivalence tests verify
+not know how well it generalizes to larger or more complex metagenomes.
+It has not been tested in a real pipeline (nf-core/mag). It still shells
+out to HMMER, Bowtie2, and FragGeneScan (which itself still requires
+Perl). No domain expert has reviewed the reimplementation. Bin quality
+has not been assessed with tools like
+[CheckM](https://github.com/Ecogenomics/CheckM) or
+[BUSCO](https://busco.ezlab.org/) — the equivalence tests verify
 identical output, not whether that output is biologically meaningful.
 I do not know whether the original's nondeterministic seed ordering
 serves a purpose — I lack the expertise to evaluate this and would
 welcome input from metagenomics researchers.
 
-More broadly: could this approach — equivalence-first rewrite, Nix for
-reproducibility, LLM for mechanical translation — be applied to other
-bioinformatics tools in similar situations? I think so, but have not
-tried.
-
 ## What's Next
 
 Now that equivalence is established, bug fixes can be applied as
 separate, documented changes — each with its own test showing the old
-(buggy) output and the new (correct) output, linked to the relevant
-upstream ticket.
+(buggy) output and the new (correct) output. The `prob_threshold`
+default mismatch is the most user-visible fix. Testing on more and
+larger datasets is needed, as is integration with the
+[nf-core/mag](https://nf-co.re/mag) pipeline — the real goal is a
+drop-in replacement module. Longer-term, replacing FragGeneScan with
+[Prodigal](https://github.com/hyattpd/Prodigal) (following
+[maxbin2_custom](https://github.com/mruehlemann/maxbin2_custom)) and
+adopting GTDB marker gene sets would address the upstream dependency
+issues that Nix currently papers over. The EM inner loop is
+embarrassingly parallel and neither implementation exploits this yet —
+it is the biggest remaining performance opportunity.
 
-Near-term:
+## Conclusion
 
-- **Fix the documented bugs.** The `prob_threshold` default mismatch is
-  the most user-visible. The `&&`/`||` separator bug is harmless in
-  practice but should be fixed on principle.
-- **Test on more datasets.** Three is a start. Community input on
-  datasets that exercise edge cases would be valuable.
-- **nf-core/mag integration.** The real goal — a drop-in replacement
-  module. This requires testing with the mag pipeline's actual
-  invocation patterns, not just standalone runs.
-
-Longer-term:
-
-- **Refactor the CLI into subcommands.** The current pipeline is a
-  single `run()` function with flags to skip stages — faithfully
-  reproducing the Perl's architecture, but increasingly awkward. The
-  right design is subcommands (`maxbin-rs filter`, `maxbin-rs seeds`,
-  `maxbin-rs em`, `maxbin-rs pipeline`) where each does one thing and
-  the full pipeline chains them. This would make stage testing trivial
-  and eliminate the accumulating duct tape of `-seeds_only`,
-  `-contig_filtered`, `-hmmout`, etc.
-- **Replace FragGeneScan with Prodigal**, following the
-  [maxbin2_custom](https://github.com/mruehlemann/maxbin2_custom)
-  approach. Prodigal is faster, better maintained, and better suited
-  to assembled contigs.
-- **Adopt GTDB marker gene sets** (also from maxbin2_custom).
-- **Parallelize the outer contig loop.** The EM inner loop iterates
-  over all contigs × all bins — embarrassingly parallel, and neither
-  the C++ nor the Rust does it yet. This is the biggest potential
-  performance improvement.
+The reimplementation produces identical output to the original MaxBin2
+on four tested datasets (up to 36K contigs), is ~8x faster on the EM
+core, and is installable with a single `nix run` command. The equivalence-first methodology —
+match the original's output, bugs included, then fix things separately
+— made the project tractable without domain expertise. Whether that
+generalizes to other bioinformatics tools in similar situations remains
+to be seen. The code, tests, and this paper are available for
+independent verification.
 
