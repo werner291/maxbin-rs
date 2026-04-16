@@ -230,7 +230,7 @@ The build script ([build.rs](build.rs)) compiles the original C++ into a static 
 and [src/original_ffi.rs](src/original_ffi.rs) exposes it to Rust via
 FFI. The [proptest](https://github.com/proptest-rs/proptest) framework
 then generates random inputs, feeds them to both the Rust function and
-the C++ function, and asserts identical output. 99 tests cover all major
+the C++ function, and asserts identical output. 109 tests cover all major
 components: FASTA parsing, abundance loading, kmer frequencies, distance
 metrics, EM probability functions, profiling, normal distribution, and
 quicksort. This layer caught real divergences: C's `atof` skips leading

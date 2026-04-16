@@ -6,10 +6,10 @@ using tetranucleotide frequency and abundance information.
 
 MaxBin2 was created by
 [Yu-Wei Wu, Blake A. Simmons, and Steven W. Singer](https://doi.org/10.1093/bioinformatics/btv638).
-This project faithfully preserves their algorithm while addressing long-standing
-packaging and reliability issues. It is not a fork — it is a clean
-reimplementation guided by the [rewrites.bio](https://rewrites.bio) principles,
-and would not exist without the original MaxBin2.
+This project reimplements their algorithm while addressing long-standing
+packaging and reliability issues, guided by the
+[rewrites.bio](https://rewrites.bio) principles. It would not exist
+without the original MaxBin2.
 
 For a detailed account of how this rewrite was done and verified, see
 [PAPER.md](PAPER.md).
@@ -67,7 +67,7 @@ nix develop
 cargo nextest run
 ```
 
-See: `tests/proptest_*.rs`, `tests/emanager_equivalence.rs`
+See: `tests/proptest_emanager.rs`, `tests/proptest_fasta.rs`, `tests/emanager_equivalence.rs`, and other `tests/proptest_*.rs` files
 
 ### 2. Pipeline stage tests (~1–10 minutes per dataset)
 
@@ -85,7 +85,7 @@ nix run .#test-pipeline-stages-minigut
 # CAPES_S7 — 25K contigs, ~2.5 GB download (~10 min)
 nix run .#test-pipeline-stages-capes
 
-# CAMI I High — 36K contigs, 577 bins (~50 min)
+# CAMI I High — 36K contigs, 240 bins (~50 min)
 nix run .#test-pipeline-stages-cami
 ```
 
