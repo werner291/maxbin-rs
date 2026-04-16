@@ -34,7 +34,7 @@ nix build github:werner291/maxbin-rs
 ```
 
 **Note:** maxbin-rs shells out to HMMER (`hmmsearch`), Bowtie2, and a gene
-caller (FragGeneScan or Prodigal) at runtime. The Nix package bundles these
+caller (FragGeneScan) at runtime. The Nix package bundles these
 automatically. If you build with `cargo build` instead, you must have these
 tools on your PATH.
 
@@ -84,6 +84,9 @@ nix run .#test-pipeline-stages-minigut
 
 # CAPES_S7 — 25K contigs, ~2.5 GB download (~10 min)
 nix run .#test-pipeline-stages-capes
+
+# CAMI I High — 36K contigs, 577 bins (~50 min)
+nix run .#test-pipeline-stages-cami
 ```
 
 See: `tests/pipeline-stages.sh` for detailed documentation of what each
