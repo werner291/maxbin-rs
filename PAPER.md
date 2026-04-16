@@ -170,9 +170,9 @@ There is an inherent tension in this project's toolchain. On one end of
 the spectrum: [Nix](https://nixos.org/), a build system that aspires to
 make every build perfectly deterministic and reproducible. On the other
 end: an LLM, which is by nature stochastic and produces different output
-on every run. These are not contradictory — they are complementary. Nix
-provides the deterministic floor that makes it (relatively) safe to use
-an inherently unpredictable code generator.
+on every run. These work together: Nix pins every dependency and build input, so when
+the LLM generates something broken, you can at least reproduce the
+breakage exactly.
 
 [Rust](https://www.rust-lang.org/). Chosen for memory safety, strong
 typing, and good C FFI — the last point critical for calling original C++
@@ -196,9 +196,8 @@ modern GCC without patches, the Perl script imports unused modules, etc.).
 
 [Claude™](https://claude.ai/) (Anthropic). Opus 4.6 for most code and
 prose, Sonnet for web searches. The use of LLMs is controversial — the
-environmental costs are real, and the economic and creative disruption is
-not hypothetical. This rewrite would not have happened without one — the
-manual effort would have been at least an order of magnitude larger.
+environmental costs are real and the economic disruption is not
+hypothetical. This rewrite would not have happened without one.
 
 To mitigate LLM confirmation bias (see [Discussion](#discussion)), I used subagents
 with fresh context for self-review — both for code and for this paper
@@ -482,14 +481,15 @@ precision difference — the equivalence tests verify this.
 ### Working with LLMs
 
 The LLM was productive at mechanical translation (C++ or Perl to
-equivalent Rust), source annotation, and test scaffolding. The failure
-modes were predictable: tautological tests (comparing output to a
-reimplementation of the same formula), confirmation bias (agreeing that
-broken code works if presented confidently), and a persistent urge to
-"improve" things rather than reproduce them. The equivalence target
-mitigates the first — it is hard to write a tautological test when the
-oracle is a separate C++ binary called via FFI. Fresh-context subagents
-help with the second. The third required constant redirection.
+equivalent Rust), source annotation, and test scaffolding. It also
+wrote tautological tests — comparing output to a reimplementation of
+the same formula, which proves nothing. The equivalence target largely
+prevents this: it is hard to write a tautological test when the oracle
+is a separate C++ binary called via FFI. LLMs will also agree that
+broken code works if presented confidently; fresh-context subagents
+(separate invocations that see only the code, not the conversation)
+helped catch this. Throughout, the LLM had to be repeatedly redirected
+away from "improving" the original rather than reproducing it.
 
 LLM reviewer agents are sensitive to prompt framing — adversarial
 prompts find overclaims, neutral prompts find the same gaps but frame
