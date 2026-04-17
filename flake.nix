@@ -58,7 +58,12 @@
           extensions = [
             "rust-src"
             "rust-analyzer"
+            "clippy"
           ];
+        };
+        rustPlatform = pkgs.makeRustPlatform {
+          cargo = rust;
+          rustc = rust;
         };
 
         # =====================================================================
@@ -90,11 +95,11 @@
         };
 
         # The Rust reimplementation — this is the main output of this project.
-        maxbin-rs = pkgs.rustPlatform.buildRustPackage {
+        maxbin-rs = rustPlatform.buildRustPackage {
           pname = "maxbin-rs";
           version = "0.1.0";
           src = ./.;
-          cargoHash = "sha256-5KrBRpVM8yM8QViX0/G/IjmFpankZL8AeCTD+pTf/zw=";
+          cargoHash = "sha256-JtKeMzunGOt6jQfSm9WGxXq2lRL61WCek+MzyxrlurI=";
           # build.rs extracts C++ source from this tarball for FFI testing.
           MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
           # Wrap the binary so HMMER, Bowtie2, and FragGeneScan are on $PATH
@@ -115,11 +120,11 @@
 
         # Same as maxbin-rs but with C++ LTO enabled for the FFI library.
         # Used for A/B benchmarking to test whether -flto closes the ~8x gap.
-        maxbin-rs-lto = pkgs.rustPlatform.buildRustPackage {
+        maxbin-rs-lto = rustPlatform.buildRustPackage {
           pname = "maxbin-rs-lto";
           version = "0.1.0";
           src = ./.;
-          cargoHash = "sha256-5KrBRpVM8yM8QViX0/G/IjmFpankZL8AeCTD+pTf/zw=";
+          cargoHash = "sha256-JtKeMzunGOt6jQfSm9WGxXq2lRL61WCek+MzyxrlurI=";
           MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
           MAXBIN2_CPP_LTO = "1";
           postInstall = ''
@@ -340,20 +345,18 @@
             mkdir -p .git/hooks
             cat > .git/hooks/pre-commit <<'HOOK'
             #!/bin/sh
-            cargo fmt
+            nix develop -c cargo fmt
             git add -u -- '*.rs'
-            nixfmt flake.nix nix/*.nix
+            nix run nixpkgs#nixfmt -- flake.nix nix/*.nix
             git add -u -- '*.nix'
             HOOK
             chmod +x .git/hooks/pre-commit
 
-            # Pre-push hook: check formatting, clippy, and tests
+            # Pre-push hook: runs the same checks as CI
             cat > .git/hooks/pre-push <<'HOOK'
             #!/bin/sh
-            echo "Running pre-push checks..."
-            cargo fmt --check || { echo "cargo fmt failed"; exit 1; }
-            cargo clippy --tests -- -D warnings || { echo "clippy failed"; exit 1; }
-            cargo nextest run || { echo "tests failed"; exit 1; }
+            echo "Running pre-push checks (nix flake check)..."
+            nix flake check || { echo "Pre-push checks failed."; exit 1; }
             echo "Pre-push checks passed."
             HOOK
             chmod +x .git/hooks/pre-push
@@ -363,6 +366,39 @@
             echo "  test contigs: $MAXBIN2_TEST_CONTIGS"
             echo "  test reads:   $MAXBIN2_TEST_READS1"
           '';
+        };
+
+        # `nix flake check` runs these automatically.
+        # The pre-push hook and CI both call `nix flake check`.
+        checks = {
+          fmt =
+            pkgs.runCommand "check-fmt"
+              {
+                nativeBuildInputs = [
+                  rust
+                  pkgs.nixfmt-rfc-style
+                ];
+              }
+              ''
+                cd ${./.}
+                cargo fmt --check
+                nixfmt --check flake.nix nix/*.nix
+                touch $out
+              '';
+          clippy = maxbin-rs.overrideAttrs (old: {
+            pname = "maxbin-rs-clippy";
+            buildPhase = "cargo clippy --tests -- -D warnings";
+            installPhase = "touch $out";
+            doCheck = false;
+            dontFixup = true;
+          });
+          tests = maxbin-rs.overrideAttrs (old: {
+            pname = "maxbin-rs-tests";
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
+            buildPhase = "cargo nextest run";
+            installPhase = "touch $out";
+            dontFixup = true;
+          });
         };
       }
     );

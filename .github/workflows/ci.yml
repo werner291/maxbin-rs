@@ -24,14 +24,8 @@ jobs:
       - name: Build
         run: nix build
 
-      - name: Unit tests
-        run: nix develop -c cargo nextest run
-
-      - name: Clippy (deny warnings)
-        run: nix develop -c cargo clippy --tests -- -D warnings
-
-      - name: Format check
-        run: nix develop -c cargo fmt --check
+      - name: Checks (fmt, clippy, tests)
+        run: nix flake check
 
       - name: Pipeline equivalence test (B. fragilis)
         run: nix build .#test-pipeline-stages
