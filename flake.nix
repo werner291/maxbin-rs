@@ -95,7 +95,7 @@
         };
 
         # The Rust reimplementation — this is the main output of this project.
-        maxbin-rs = rustPlatform.buildRustPackage {
+        maxbin-rs = pkgs.rustPlatform.buildRustPackage {
           pname = "maxbin-rs";
           version = "0.1.0";
           src = ./.;
@@ -120,7 +120,7 @@
 
         # Same as maxbin-rs but with C++ LTO enabled for the FFI library.
         # Used for A/B benchmarking to test whether -flto closes the ~8x gap.
-        maxbin-rs-lto = rustPlatform.buildRustPackage {
+        maxbin-rs-lto = pkgs.rustPlatform.buildRustPackage {
           pname = "maxbin-rs-lto";
           version = "0.1.0";
           src = ./.;
@@ -385,13 +385,19 @@
                 nixfmt --check flake.nix nix/*.nix
                 touch $out
               '';
-          clippy = maxbin-rs.overrideAttrs (old: {
-            pname = "maxbin-rs-clippy";
-            buildPhase = "cargo clippy --tests -- -D warnings";
-            installPhase = "touch $out";
-            doCheck = false;
-            dontFixup = true;
-          });
+          clippy = (
+            rustPlatform.buildRustPackage {
+              pname = "maxbin-rs-clippy";
+              version = "0.1.0";
+              src = ./.;
+              cargoHash = "sha256-JtKeMzunGOt6jQfSm9WGxXq2lRL61WCek+MzyxrlurI=";
+              MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
+              buildPhase = "cargo clippy --tests -- -D warnings";
+              installPhase = "touch $out";
+              doCheck = false;
+              dontFixup = true;
+            }
+          );
           tests = maxbin-rs.overrideAttrs (old: {
             pname = "maxbin-rs-tests";
             nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
