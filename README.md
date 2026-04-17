@@ -38,6 +38,21 @@ caller (FragGeneScan) at runtime. The Nix package bundles these
 automatically. If you build with `cargo build` instead, you must have these
 tools on your PATH.
 
+### Docker
+
+```bash
+docker pull ghcr.io/werner291/maxbin-rs:v0.1.1
+docker run --rm \
+  -v /path/to/data:/data \
+  ghcr.io/werner291/maxbin-rs:v0.1.1 \
+  -contig /data/contigs.fa.gz \
+  -reads /data/reads.fastq.gz \
+  -out /data/output/bins
+```
+
+The image is built by Nix and includes all runtime dependencies. Published
+automatically on version tags.
+
 ### Adding to a NixOS / home-manager config
 
 ```nix
@@ -76,18 +91,21 @@ pre-computed intermediates from the original MaxBin2. No Bowtie2/HMMER runs
 during the test itself — the slow parts are cached by Nix.
 
 ```bash
-# B. fragilis — small, fast (~1 min)
-nix run .#test-pipeline-stages
+# B. fragilis — small, fast (~1 min, runs in CI)
+nix build .#test-pipeline-stages
 
 # minigut — multi-organism (~2 min)
-nix run .#test-pipeline-stages-minigut
+nix build .#test-pipeline-stages-minigut
 
 # CAPES_S7 — 25K contigs, ~2.5 GB download (~10 min)
-nix run .#test-pipeline-stages-capes
+nix build .#test-pipeline-stages-capes
 
 # CAMI I High — 36K contigs, 240 bins (~50 min)
-nix run .#test-pipeline-stages-cami
+nix build .#test-pipeline-stages-cami
 ```
+
+These run in the Nix build sandbox — isolated filesystem, no network, no
+host environment. The only inputs are the explicit Nix store paths.
 
 See: `tests/pipeline-stages.sh` for detailed documentation of what each
 stage tests and example output.
