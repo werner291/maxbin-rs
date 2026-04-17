@@ -444,8 +444,17 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
     // Step 4: HMMER marker gene search
     let marker_hmm = find_marker_hmm(cli)?;
     let hmmout = PathBuf::from(format!("{}.hmmout", filtered_contigs.display()));
-    eprintln!("Running HMMER hmmsearch...");
-    crate::external::run_hmmsearch(&faa_path, &marker_hmm, &hmmout, cli.thread)?;
+    eprintln!(
+        "Running HMMER hmmsearch (marker HMM: {})...",
+        marker_hmm.display()
+    );
+    crate::external::run_hmmsearch(&faa_path, &marker_hmm, &hmmout, cli.thread, cli.markerset)?;
+
+    // Count HMMER hits for diagnostics
+    let hmm_hit_count = std::fs::read_to_string(&hmmout)
+        .map(|s| s.lines().filter(|l| !l.starts_with('#')).count())
+        .unwrap_or(0);
+    eprintln!("  HMMER produced {} hits", hmm_hit_count);
 
     // Step 5: Generate seed file from HMM results
     let seed_file = PathBuf::from(format!("{}.seed", cli.out));
@@ -469,9 +478,6 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         )?;
     }
 
-    // Step 6: Run EM
-    eprintln!("Running EM algorithm...");
-
     // Read seeds
     let seed_content =
         std::fs::read_to_string(&seed_file).map_err(|e| format!("Can't read seed file: {e}"))?;
@@ -481,9 +487,11 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         .filter(|l| !l.is_empty())
         .collect();
 
+    eprintln!("  {} seed contigs found", seed_names.len());
     if seed_names.len() <= 1 {
         return Err("Need at least 2 seed contigs to run EM.".into());
     }
+    eprintln!("Running EM algorithm...");
 
     let abund_path_refs: Vec<&Path> = abund_files.iter().map(|p| p.as_path()).collect();
 
@@ -532,20 +540,25 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
 /// to common install locations.
 fn find_marker_hmm(cli: &PipelineArgs) -> Result<PathBuf, String> {
     let filename = cli.marker_hmm_filename();
+    eprintln!("Looking for marker HMM file: {filename}");
 
     // Check next to the executable
     if let Ok(exe) = std::env::current_exe()
         && let Some(dir) = exe.parent()
     {
         let candidate = dir.join(filename);
+        eprintln!("  checking: {}", candidate.display());
         if candidate.exists() {
+            eprintln!("  found: {}", candidate.display());
             return Ok(candidate);
         }
     }
 
     // Check in the current directory
     let candidate = PathBuf::from(filename);
+    eprintln!("  checking: {}", candidate.display());
     if candidate.exists() {
+        eprintln!("  found: {}", candidate.display());
         return Ok(candidate);
     }
 

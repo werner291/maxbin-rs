@@ -82,28 +82,42 @@ pub fn run_prodigal(contig: &Path, out_prefix: &str) -> Result<(), String> {
 /// Run HMMER hmmsearch against marker gene HMM profiles.
 /// Produces {out_file} (hmmsearch table output).
 ///
-/// Matches run_MaxBin.pl:~470-490:
-///   `hmmsearch --domtblout $hmmout --cut_tc --cpu $thread $marker_hmm $faa`
+/// Matches run_MaxBin.pl:~1076-1093:
+///   markerset=107: `hmmsearch --domtblout $hmmout --cut_tc --cpu $thread $marker_hmm $faa`
+///   markerset=40:  `hmmsearch --domtblout $hmmout -E 1e-3 --cpu $thread $marker_hmm $faa`
+///
+/// The 107-gene marker set (marker.hmm) has TC bit score thresholds; the
+/// 40-gene set (bacar_marker.hmm) does not, so the original uses E-value
+/// cutoff instead.
 pub fn run_hmmsearch(
     faa_file: &Path,
     marker_hmm: &Path,
     out_file: &Path,
     threads: usize,
+    markerset: u32,
 ) -> Result<(), String> {
-    let status = Command::new("hmmsearch")
-        .arg("--domtblout")
-        .arg(out_file)
-        .arg("--cut_tc")
-        .arg("--cpu")
+    let mut cmd = Command::new("hmmsearch");
+    cmd.arg("--domtblout").arg(out_file);
+
+    if markerset == 107 {
+        cmd.arg("--cut_tc");
+    } else {
+        cmd.args(["-E", "1e-3"]);
+    }
+
+    cmd.arg("--cpu")
         .arg(threads.to_string())
         .arg(marker_hmm)
         .arg(faa_file)
-        .stdout(std::process::Stdio::null())
-        .status()
+        .stdout(std::process::Stdio::null());
+
+    let output = cmd
+        .output()
         .map_err(|e| format!("Failed to run hmmsearch: {e}"))?;
 
-    if !status.success() {
-        return Err("hmmsearch failed. Check that hmmsearch is on PATH.".into());
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("hmmsearch failed:\n{stderr}"));
     }
     Ok(())
 }

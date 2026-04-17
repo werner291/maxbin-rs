@@ -197,7 +197,8 @@ echo "  Running maxbin-rs..."
 maxbin-rs -contig "$CONTIGS" \
   -abund "$ABUND" -out "$RUST/test" -thread 1 \
   -markerset 40 \
-  2> "$RUST/stderr.log" || true
+  2>&1 || true
+echo "  maxbin-rs output files: $(ls "$RUST"/test.* 2>/dev/null || echo '(none)')"
 
 compare_bins "$ORIG" "$RUST" "4.1 bins (markerset=40)"
 
