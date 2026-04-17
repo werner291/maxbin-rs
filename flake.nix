@@ -245,6 +245,10 @@
             test-pipeline-stages-capes
             test-pipeline-stages-cami
             test-pipeline-stages-metahit
+            test-cli
+            test-cli-minigut
+            test-cli-equivalence
+            test-cli-equivalence-minigut
             bench-components
             bench-cpp-lto
             disasm-em

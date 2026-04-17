@@ -60,6 +60,64 @@ let
         # runCommand requires an output — touch $out to signal success.
         touch $out
       '';
+
+  # Helper: create a sandboxed CLI integration test for a given dataset.
+  # Runs tests/cli-integration.sh with the binary on PATH and test data
+  # available. Tests flag parsing, subcommands, error cases, and output
+  # validation end-to-end.
+  mkCliTest =
+    {
+      name,
+      dataset,
+      intermediates',
+    }:
+    runCommand "test-cli-${name}"
+      {
+        nativeBuildInputs = [
+          maxbin2
+          maxbin-rs
+        ];
+      }
+      ''
+        export CONTIGS="${dataset.contigs}"
+        export READS1="${dataset.reads1}"
+        ${if dataset ? reads2 then ''export READS2="${dataset.reads2}"'' else ""}
+        export INTERMEDIATES="${intermediates'}"
+        export MAXBIN_RS_DETERMINISTIC=1
+        export HOME=$(mktemp -d)
+
+        bash ${../tests/cli-integration.sh}
+
+        touch $out
+      '';
+
+  # Helper: create a sandboxed CLI equivalence test for a given dataset.
+  # Runs both maxbin-rs and the original MaxBin2 with the same flags,
+  # then compares output bins. Tests drop-in replacement at the CLI level.
+  mkCliEquivTest =
+    {
+      name,
+      dataset,
+      intermediates',
+    }:
+    runCommand "test-cli-equivalence-${name}"
+      {
+        nativeBuildInputs = [
+          maxbin2
+          maxbin-rs
+        ];
+      }
+      ''
+        export CONTIGS="${dataset.contigs}"
+        ${if dataset ? reads1 then ''export READS1="${dataset.reads1}"'' else ""}
+        export INTERMEDIATES="${intermediates'}"
+        export MAXBIN_RS_DETERMINISTIC=1
+        export HOME=$(mktemp -d)
+
+        bash ${../tests/cli-equivalence.sh}
+
+        touch $out
+      '';
 in
 {
   test-pipeline-stages = mkStageTest {
@@ -90,6 +148,32 @@ in
     name = "metahit";
     dataset = datasets.metahit;
     intermediates' = intermediates.metahit;
+  };
+
+  # CLI integration tests — end-to-end flag parsing, subcommands, error cases.
+  test-cli = mkCliTest {
+    name = "bfragilis";
+    dataset = datasets.bfragilis;
+    intermediates' = intermediates.bfragilis;
+  };
+
+  test-cli-minigut = mkCliTest {
+    name = "minigut";
+    dataset = datasets.minigut;
+    intermediates' = intermediates.minigut;
+  };
+
+  # CLI equivalence tests — run both tools, compare output.
+  test-cli-equivalence = mkCliEquivTest {
+    name = "bfragilis";
+    dataset = datasets.bfragilis;
+    intermediates' = intermediates.bfragilis;
+  };
+
+  test-cli-equivalence-minigut = mkCliEquivTest {
+    name = "minigut";
+    dataset = datasets.minigut;
+    intermediates' = intermediates.minigut;
   };
 
   # LTO A/B benchmark: runs the CAMI I High EM three ways (C++ baseline,
