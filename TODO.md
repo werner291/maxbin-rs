@@ -97,6 +97,40 @@ lack of ongoing maintenance rather than poor original engineering.
 - [ ] 2025 benchmark (Nature Comms, PMC11933696): MetaBAT2 competitive with deep learning
   binners while finishing in minutes; MaxBin2 not separately benchmarked but known slower
 
+### Pipeline equivalence gaps (found via CLI surface comparison)
+
+Critical — these affect bin output and must be fixed before claiming equivalence:
+
+- [ ] **Recursive binning** — the original re-bins each output bin up to 5 levels deep
+  (`$RECURSION_MAX = 5` in run_MaxBin.pl:467-579). We run a single EM pass.
+  On simple datasets the results match, but on real metagenomes with mixed genomes
+  the original will produce many more bins via recursive splitting. This is the core
+  of MaxBin2's bin refinement strategy.
+- [ ] **MIN_BIN_SIZE filtering** — original drops bins < 100kbp to noclass
+  (run_MaxBin.pl:606-626). We keep all bins regardless of size.
+- [ ] **Bin sorting by abundance** — original sorts bins by descending abundance
+  and renumbers them (run_MaxBin.pl:628-663). We number sequentially.
+- [x] **hmmsearch flags for markerset=40** — fixed: now uses `-E 1e-3` instead of `--cut_tc`
+- [ ] **Abundance file header stripping** — original strips leading `>` from abundance
+  headers (run_MaxBin.pl:1505-1532 `checkAbundFile`). We don't, so abundance files
+  with `>contig_name\tabundance` format will fail to match FASTA headers.
+
+Moderate — missing features:
+
+- [ ] `-verbose` flag accepted but silently ignored (original passes to C++ core)
+- [ ] `-plotmarker` flag accepted but silently ignored (original generates heatmap PDF via R)
+- [ ] No `.log` file output (original writes structured log to `$out_f.log`)
+- [ ] No `.abundance` file for multi-sample runs (run_MaxBin.pl:841-851)
+- [ ] No per-bin marker tarball (`marker_of_each_bin.tar.gz`)
+- [ ] `-reassembly` flag not accepted (original does IDBA-UD reassembly per bin)
+
+Minor:
+
+- [ ] Reads format detection: only checks extension, no file-content fallback, no bzip2
+  (original reads first line and supports `.q.gz`, `.a.gz`, `.q.bz2`, `.a.bz2`)
+- [ ] Incomplete intermediate cleanup (SAM files, `.bt2` index files, reads-derived
+  abundance files not deleted)
+
 ### Code quality
 
 - [ ] Replace hand-rolled CLI parsing (~1000 lines in `cli.rs`) with clap derive.
