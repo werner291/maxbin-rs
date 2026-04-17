@@ -1,6 +1,7 @@
 # Rewriting MaxBin2 in Rust: A Case Study in Equivalence-First Bioinformatics Rewrites
 
-**Werner Kroneman, April 2026**
+**Werner Kroneman, April 2026**\
+**Applies to: v0.1.0 (`13b026f`)**
 
 ## Disclosure
 

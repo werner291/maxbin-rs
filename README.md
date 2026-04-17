@@ -152,6 +152,17 @@ approximately 8x faster than the original C++ EM (see
 - GTDB marker gene sets
 - nf-core/mag drop-in module
 
+## Versioning
+
+See [VERSIONING.md](VERSIONING.md) for the full policy. In short:
+
+- **v0.1.x** — bug-for-bug compatible with the original MaxBin2. Drop-in replacement (not yet externally verified).
+- **v0.2.x** — correctness fixes that change output (e.g., `prob_threshold` default, duplicate contigs).
+- **v0.3+** — new features (Prodigal, GTDB markers, etc.).
+
+"Breaking change" means "changes binning output on the same input." Crash fixes,
+better errors, and performance improvements are never breaking.
+
 ## Citation
 
 If you use this tool, please cite the original work:

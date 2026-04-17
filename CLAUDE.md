@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-maxbin-rs is a Rust reimplementation of MaxBin2, a metagenome binning tool. It clusters assembled contigs into individual genomes using an EM algorithm over tetranucleotide frequency and abundance data. Status: early planning — no Rust code exists yet.
+maxbin-rs is a Rust reimplementation of MaxBin2, a metagenome binning tool. It clusters assembled contigs into individual genomes using an EM algorithm over tetranucleotide frequency and abundance data. Currently at v0.1.0: equivalence-tested rewrite.
 
 The project follows the [rewrites.bio](https://rewrites.bio) principles: faithful algorithm preservation while fixing packaging, performance, and reliability problems. See TODO.md for the full complaint catalog, roadmap, and algorithm summary.
 
@@ -46,6 +46,13 @@ Correctness is verified through **equivalence tests**: run a component from the 
 - The Perl orchestration script (`run_MaxBin.pl`) does significant preprocessing
   (contig filtering, header munging, abundance generation, output assembly) that
   must also be equivalence-tested — not just the C++ core.
+
+## Versioning
+
+See [VERSIONING.md](VERSIONING.md). Key rule: **"breaking change" = changes binning
+output on the same input.** v0.1.x is bug-for-bug compatible with original MaxBin2.
+v0.2.x introduces correctness fixes that change output. Bug fixes (crashes, packaging,
+diagnostics) never need a minor version bump.
 
 ## Key Design Goals
 

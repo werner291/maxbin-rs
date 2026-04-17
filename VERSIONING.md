@@ -1,0 +1,50 @@
+# Versioning
+
+maxbin-rs follows [Semantic Versioning](https://semver.org/) with one
+domain-specific clarification: **"breaking change" means "changes binning
+output on the same input."**
+
+Pipeline users care about reproducibility. A crash fix or a better error
+message is not breaking. A different default threshold that changes which
+contigs end up in which bin is.
+
+## Version series
+
+### v0.1.x — Bug-for-bug compatible
+
+Output matches the original MaxBin2 (modulo seed ordering, which is
+non-deterministic in both tools). This is the "drop-in replacement" series.
+
+Allowed changes:
+- Crash fixes, error handling, better diagnostics
+- Packaging and build fixes
+- Performance improvements that don't change output
+- Documentation
+
+Not allowed:
+- Anything that changes bin assignments on the same input
+
+### v0.2.x — Correctness fixes
+
+Fixes behavioral bugs in the original that change output:
+- `prob_threshold` default (0.5 in code vs 0.9 in docs)
+- Duplicate contigs across bins
+- Other correctness issues documented in TODO.md
+
+Each change is documented in the changelog with before/after impact.
+
+### v0.3+ — New features
+
+Prodigal gene caller, GTDB markers, parallelized outer loop, etc.
+Version numbers TBD when we get there.
+
+## Branching
+
+`main` targets the next release. When main moves past a version series
+(e.g., starts v0.2 work), a `release/0.1` branch is created from the
+last v0.1.x tag for any necessary backports.
+
+There is currently one maintainer. Commits go directly to main.
+If contributors appear, this scales to PR-based review naturally —
+the versioning contract stays the same regardless of process.
+
