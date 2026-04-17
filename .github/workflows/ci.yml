@@ -36,6 +36,12 @@ jobs:
       - name: Pipeline equivalence test (B. fragilis)
         run: nix build .#test-pipeline-stages
 
+      - name: CLI integration tests (B. fragilis)
+        run: nix build .#test-cli
+
+      - name: CLI equivalence tests (B. fragilis)
+        run: nix build .#test-cli-equivalence
+
       - name: Docker VM test
         run: |
           sudo chmod 666 /dev/kvm
