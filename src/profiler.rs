@@ -102,13 +102,13 @@ fn compute_profile(kmerlen: usize, seq: &[u8], kmap: &KmerMap, profile: &mut [f6
 
     // Matches Profiler.cpp:98-118: normalize; zero out if all-N or no valid k-mers
     if percent_n == 1.0 || total == 0 {
-        for i in 0..entry_num {
-            profile[i] = 0.0;
+        for p in profile.iter_mut().take(entry_num) {
+            *p = 0.0;
         }
     } else {
         // Matches Profiler.cpp:113-117: divide each count by total valid k-mers
-        for i in 0..entry_num {
-            profile[i] /= total as f64;
+        for p in profile.iter_mut().take(entry_num) {
+            *p /= total as f64;
         }
     }
 

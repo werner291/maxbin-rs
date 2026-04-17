@@ -1,9 +1,10 @@
-/// Exact reimplementation of MaxBin2's NormalDistribution.
-///
-/// Uses pi = 3.1415926 (NOT std::f64::consts::PI) to match the original.
+//! Exact reimplementation of MaxBin2's NormalDistribution.
+//!
+//! Uses pi = 3.1415926 (NOT std::f64::consts::PI) to match the original.
 
 /// The truncated pi value used in the original MaxBin2 code.
 /// Matches NormalDistribution.cpp:5: `pi = 3.1415926;`
+#[allow(clippy::approx_constant)]
 const MAXBIN2_PI: f64 = 3.1415926;
 
 pub struct NormalDistribution {

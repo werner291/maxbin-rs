@@ -55,7 +55,6 @@ pub fn filter_contigs(
         Box::new(std::io::BufReader::new(file))
     };
 
-    const FASTA_LEN: usize = 70;
     let mut current_header = String::new();
     let mut current_seq = Vec::<u8>::new();
     let mut n_filtered = 0usize;
@@ -83,7 +82,7 @@ pub fn filter_contigs(
                     n_tooshort += 1;
                 }
                 let total = n_filtered + n_tooshort;
-                if total % 10000 == 0 {
+                if total.is_multiple_of(10000) {
                     eprintln!(
                         "  filtering contigs: {} kept, {} too short...",
                         n_filtered, n_tooshort
@@ -311,10 +310,12 @@ pub fn run_em(args: &EmArgs) -> Result<(), String> {
 
     let abund_path_refs: Vec<&Path> = abund_files.iter().map(|p| p.as_path()).collect();
 
-    let mut params = crate::emanager::EmParams::default();
-    params.min_seq_length = args.min_contig_length;
-    params.max_em = args.max_iteration;
-    params.min_prob_threshold = args.prob_threshold;
+    let params = crate::emanager::EmParams {
+        min_seq_length: args.min_contig_length,
+        max_em: args.max_iteration,
+        min_prob_threshold: args.prob_threshold,
+        ..Default::default()
+    };
 
     eprintln!("Loading data...");
     let t_load = std::time::Instant::now();
@@ -486,10 +487,12 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
 
     let abund_path_refs: Vec<&Path> = abund_files.iter().map(|p| p.as_path()).collect();
 
-    let mut params = crate::emanager::EmParams::default();
-    params.min_seq_length = cli.min_contig_length;
-    params.max_em = cli.max_iteration;
-    params.min_prob_threshold = cli.prob_threshold;
+    let params = crate::emanager::EmParams {
+        min_seq_length: cli.min_contig_length,
+        max_em: cli.max_iteration,
+        min_prob_threshold: cli.prob_threshold,
+        ..Default::default()
+    };
 
     crate::emanager::run_pipeline(
         &filtered_contigs,
@@ -531,12 +534,12 @@ fn find_marker_hmm(cli: &PipelineArgs) -> Result<PathBuf, String> {
     let filename = cli.marker_hmm_filename();
 
     // Check next to the executable
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = dir.join(filename);
-            if candidate.exists() {
-                return Ok(candidate);
-            }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        let candidate = dir.join(filename);
+        if candidate.exists() {
+            return Ok(candidate);
         }
     }
 
@@ -592,8 +595,6 @@ fn generate_seeds(
         /// Unique contigs in insertion order (matching Perl's @queryseq array).
         /// Order matters: seeds are written in this order, which determines bin numbering.
         contigs: Vec<String>,
-        /// Set for O(1) dedup lookups (matches Perl's %tmphash)
-        contig_set: HashSet<String>,
         query_len: f64,
     }
     let mut markers: Vec<(String, MarkerInfo)> = Vec::new();
@@ -642,7 +643,6 @@ fn generate_seeds(
                     current_marker.clone(),
                     MarkerInfo {
                         contigs: current_contigs.clone(),
-                        contig_set: current_contig_set.clone(),
                         query_len: current_query_len,
                     },
                 ));
@@ -668,7 +668,6 @@ fn generate_seeds(
             current_marker,
             MarkerInfo {
                 contigs: current_contigs,
-                contig_set: current_contig_set,
                 query_len: current_query_len,
             },
         ));
@@ -801,8 +800,6 @@ fn rewrite_summary(
     hmmout: &Path,
     marker_hmm: &Path,
 ) -> Result<(), String> {
-    use std::io::BufRead;
-
     // Read the C++ summary to get abundance values
     let summary_path = format!("{output_prefix}.summary");
     let raw_summary =
@@ -1054,12 +1051,12 @@ fn write_marker_counts(
     writeln!(out).map_err(|e| e.to_string())?;
 
     // Per-bin rows
-    for i in 0..bin_count {
+    for (i, bin_counts) in counts.iter().enumerate().take(bin_count) {
         let bin_num = format!("{:03}", i + 1);
-        let total: u32 = counts[i].iter().sum();
-        let unique: u32 = counts[i].iter().filter(|&&c| c > 0).count() as u32;
+        let total: u32 = bin_counts.iter().sum();
+        let unique: u32 = bin_counts.iter().filter(|&&c| c > 0).count() as u32;
         write!(out, "{out_name}.{bin_num}.fasta\t{total}\t{unique}").map_err(|e| e.to_string())?;
-        for &c in &counts[i] {
+        for &c in bin_counts {
             if c > 0 {
                 write!(out, "\t{c}").map_err(|e| e.to_string())?;
             } else {

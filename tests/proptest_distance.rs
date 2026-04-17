@@ -7,7 +7,6 @@
 ///
 /// Generators exercise: short sequences (< kmerlen, producing all-zero profiles),
 /// normal sequences (20-200bp), long sequences (500-2000bp), N-containing sequences.
-
 mod distance_proptest {
     use proptest::prelude::*;
 

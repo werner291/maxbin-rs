@@ -5,7 +5,6 @@
 /// - get_mapping() / get_reverse_mapping_*(): kmermap_per_kmer_proptest (variable kmerlen 2-5)
 /// - Invalid k-mers (non-ACGT): kmermap_invalid_kmer_equivalence
 /// - Lowercase k-mers: kmermap_lowercase_kmer_equivalence
-
 mod kmermap_proptest {
     use proptest::prelude::*;
 

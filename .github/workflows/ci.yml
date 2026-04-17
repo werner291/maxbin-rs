@@ -27,6 +27,9 @@ jobs:
       - name: Unit tests
         run: nix develop -c cargo nextest run
 
+      - name: Clippy (deny warnings)
+        run: nix develop -c cargo clippy --tests -- -D warnings
+
       - name: Format check
         run: nix develop -c cargo fmt --check
 

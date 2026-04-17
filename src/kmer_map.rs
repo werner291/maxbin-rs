@@ -1,7 +1,7 @@
-/// Exact reimplementation of MaxBin2's kmerMap.
-///
-/// Encodes bases as A=0, T=1, C=2, G=3.
-/// In symmetric mode, reverse-complement k-mers map to the same index.
+//! Exact reimplementation of MaxBin2's kmerMap.
+//!
+//! Encodes bases as A=0, T=1, C=2, G=3.
+//! In symmetric mode, reverse-complement k-mers map to the same index.
 
 /// Encode a single base character to its numeric value.
 /// Returns `None` for non-ACGT characters.
@@ -102,7 +102,7 @@ impl KmerMap {
     pub fn get_entry_num(&self) -> usize {
         if self.symmetric {
             // Matches kmerMap.cpp:83-91: even vs odd kmer length formula
-            if self.kmerlen % 2 == 0 {
+            if self.kmerlen.is_multiple_of(2) {
                 (self.entry_num + 4usize.pow((self.kmerlen / 2) as u32)) / 2
             } else {
                 self.entry_num / 2
@@ -154,7 +154,7 @@ impl KmerMap {
 /// Matches kmerMap.cpp:99-174 (buildKmerMappingTable() symmetric branch)
 fn build_symmetric_table(kmerlen: usize, entry_num: usize) -> Vec<i32> {
     // Matches kmerMap.cpp:103-112: compute size of kmer_small/kmer_large arrays
-    let max_pairs = if kmerlen % 2 == 0 {
+    let max_pairs = if kmerlen.is_multiple_of(2) {
         (entry_num + 4usize.pow((kmerlen / 2) as u32)) / 2
     } else {
         entry_num / 2
@@ -174,13 +174,7 @@ fn build_symmetric_table(kmerlen: usize, entry_num: usize) -> Vec<i32> {
         let (k, p) = if i <= j { (i, j) } else { (j, i) };
 
         // Matches kmerMap.cpp:137-144: linear scan to check if pair already recorded
-        let mut found = false;
-        for idx in 0..kmer_num {
-            if kmer_small[idx] == k as i32 {
-                found = true;
-                break;
-            }
-        }
+        let found = kmer_small[..kmer_num].contains(&(k as i32));
         // Matches kmerMap.cpp:145-150: record the new pair
         if !found {
             kmer_small[kmer_num] = k as i32;

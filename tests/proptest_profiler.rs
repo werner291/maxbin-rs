@@ -6,7 +6,6 @@
 ///   short sequences (1-3 bases, below kmerlen), long sequences (500-2000bp).
 /// - reset() / add_profile() / calc_profile(): algebraic invariant tests
 ///   (C++ FFI does not expose addProfile/calcProfile directly)
-
 mod profiler_proptest {
     use proptest::prelude::*;
 

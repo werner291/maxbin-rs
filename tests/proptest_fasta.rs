@@ -87,21 +87,21 @@ proptest! {
             "record count mismatch"
         );
 
-        for i in 0..rust_records.len() {
+        for (i, rust_rec) in rust_records.iter().enumerate() {
             let idx = i as u32;
             prop_assert_eq!(
-                &rust_records[i].header,
+                &rust_rec.header,
                 &original.header(idx),
                 "header mismatch at record {}", i
             );
             prop_assert_eq!(
-                &rust_records[i].seq,
+                &rust_rec.seq,
                 &original.seq(idx),
-                "seq mismatch at record {} (header: {})", i, rust_records[i].header
+                "seq mismatch at record {} (header: {})", i, rust_rec.header
             );
             // Also check sequence length
             prop_assert_eq!(
-                rust_records[i].len() as u32,
+                rust_rec.len() as u32,
                 original.seq_len(idx),
                 "seq_len mismatch at record {} (header: {})", i, rust_records[i].header
             );

@@ -168,7 +168,7 @@ pub fn init_em(
         for (i, rec) in records.iter().enumerate() {
             abund_vec[i] = *abund_map
                 .get(rec.header.as_str())
-                .expect(&format!("abundance not found for contig: {}", rec.header));
+                .unwrap_or_else(|| panic!("abundance not found for contig: {}", rec.header));
         }
         seq_abundance.push(abund_vec);
     }
@@ -201,7 +201,7 @@ pub fn init_em(
     for name in seed_names {
         let &idx = header_to_idx
             .get(name.as_str())
-            .expect(&format!("seed not found in FASTA: {name}"));
+            .unwrap_or_else(|| panic!("seed not found in FASTA: {name}"));
         seed_indices.push(idx);
 
         // Matches EManager.cpp:382-384: seed_profile[j] = new Profiler(...)
@@ -273,8 +273,8 @@ fn compute_abund_prob_for_contig(
             asum += abund_prob[j][k];
         }
         // Matches EManager.cpp:1077-1080: normalize abund_prob
-        for j in 0..seed_num {
-            abund_prob[j][k] /= asum;
+        for row in abund_prob.iter_mut() {
+            row[k] /= asum;
         }
     }
     abund_prob
@@ -299,17 +299,20 @@ fn compute_abund_prob_for_contig_par(
         .into_par_iter()
         .map(|k| {
             let abund = seq_abundance[k][i];
-            let mut col = vec![0.0f64; seed_num];
-            let mut asum = 0.0f64;
-            for j in 0..seed_num {
-                col[j] = get_prob_abund(abund, seed_abundance[j][k]);
-                if col[j] < very_small_double {
-                    col[j] = very_small_double;
-                }
-                asum += col[j];
-            }
-            for j in 0..seed_num {
-                col[j] /= asum;
+            let mut col: Vec<f64> = seed_abundance
+                .iter()
+                .map(|sa| {
+                    let p = get_prob_abund(abund, sa[k]);
+                    if p < very_small_double {
+                        very_small_double
+                    } else {
+                        p
+                    }
+                })
+                .collect();
+            let asum: f64 = col.iter().sum();
+            for c in col.iter_mut() {
+                *c /= asum;
             }
             col
         })
@@ -364,21 +367,21 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
             if state.records[i].len() >= params.min_seq_length && !state.is_profile_n[i] {
                 // Matches EManager.cpp:516-531: compute tetranucleotide dist probabilities
                 let mut sum = 0.0f64;
-                for j in 0..seed_num {
+                for (dp, seed_prof) in dist_prob.iter_mut().zip(state.seed_profiles.iter()) {
                     let d = distance::euc_dist_profiles(
                         state.seq_profiles[i].get_profile(),
-                        state.seed_profiles[j].get_profile(),
+                        seed_prof.get_profile(),
                     );
-                    dist_prob[j] = get_prob_dist(d, &intra, &inter);
+                    *dp = get_prob_dist(d, &intra, &inter);
                     // Matches EManager.cpp:522-525: clamp to VERY_SMALL_DOUBLE
-                    if dist_prob[j] < params.very_small_double {
-                        dist_prob[j] = params.very_small_double;
+                    if *dp < params.very_small_double {
+                        *dp = params.very_small_double;
                     }
-                    sum += dist_prob[j];
+                    sum += *dp;
                 }
                 // Matches EManager.cpp:528-531: normalize dist_prob
-                for j in 0..seed_num {
-                    dist_prob[j] /= sum;
+                for dp in dist_prob.iter_mut() {
+                    *dp /= sum;
                 }
 
                 // Compute abundance probabilities (threadfunc_E equivalent)
@@ -405,12 +408,12 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
 
                 // Matches EManager.cpp:555-568: combine dist_prob and abund_prob
                 let mut sum = 0.0f64;
-                for j in 0..seed_num {
+                for (j, (&dp, ap_row)) in dist_prob.iter().zip(abund_prob.iter()).enumerate() {
                     // Matches EManager.cpp:562: seq_prob[i][j] = dist_prob[j]
-                    state.seq_prob[i][j] = dist_prob[j];
+                    state.seq_prob[i][j] = dp;
                     // Matches EManager.cpp:564-566: multiply by each abundance probability
-                    for k in 0..ab_num {
-                        state.seq_prob[i][j] *= abund_prob[j][k];
+                    for &ap in ap_row {
+                        state.seq_prob[i][j] *= ap;
                     }
                     sum += state.seq_prob[i][j];
                 }
@@ -446,25 +449,29 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
         // M-step: Matches EManager.cpp:1084-1128 (threadfunc_M(int i))
         for si in 0..seed_num {
             // Matches EManager.cpp:1090-1093: reset seed abundance to zero
-            for k in 0..ab_num {
-                state.seed_abundance[si][k] = 0.0;
+            for v in state.seed_abundance[si].iter_mut() {
+                *v = 0.0;
             }
             // Matches EManager.cpp:1094: seed_profile[i]->reset()
             state.seed_profiles[si].reset();
 
             let mut d = 0.0f64;
+            #[allow(clippy::needless_range_loop)] // j indexes 5+ parallel arrays
             for j in 0..seqnum {
                 let len = state.records[j].len();
                 // Matches EManager.cpp:1105: NaN check via seq_prob[j][i] == seq_prob[j][i]
                 // (IEEE 754: NaN != NaN, so this is false iff the value is NaN)
                 if len >= params.min_seq_length
-                    && state.seq_prob[j][si] == state.seq_prob[j][si]
+                    && !state.seq_prob[j][si].is_nan()
                     && !state.is_profile_n[j]
                 {
                     // Matches EManager.cpp:1108-1111: weight = len * seq_prob; accumulate abundance
                     let weight = len as f64 * state.seq_prob[j][si];
-                    for k in 0..ab_num {
-                        state.seed_abundance[si][k] += state.seq_abundance[k][j] * weight;
+                    for (sa, seq_ab) in state.seed_abundance[si]
+                        .iter_mut()
+                        .zip(state.seq_abundance.iter())
+                    {
+                        *sa += seq_ab[j] * weight;
                     }
                     // Matches EManager.cpp:1112: d += len * seq_prob
                     d += weight;
@@ -477,8 +484,8 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
             state.seed_profiles[si].calc_profile(d);
 
             // Matches EManager.cpp:1124-1126: seed_abundance[i][k] /= d
-            for k in 0..ab_num {
-                state.seed_abundance[si][k] /= d;
+            for v in state.seed_abundance[si].iter_mut() {
+                *v /= d;
             }
         }
 
@@ -524,16 +531,16 @@ pub fn classify(state: &mut EmState, params: &EmParams) {
             if !state.is_estimated[i] {
                 // Matches EManager.cpp:671-680: recompute dist_prob
                 let mut sum = 0.0f64;
-                for j in 0..seed_num {
+                for (dp, seed_prof) in dist_prob.iter_mut().zip(state.seed_profiles.iter()) {
                     let d = distance::euc_dist_profiles(
                         state.seq_profiles[i].get_profile(),
-                        state.seed_profiles[j].get_profile(),
+                        seed_prof.get_profile(),
                     );
-                    dist_prob[j] = get_prob_dist(d, &intra, &inter);
-                    sum += dist_prob[j];
+                    *dp = get_prob_dist(d, &intra, &inter);
+                    sum += *dp;
                 }
-                for j in 0..seed_num {
-                    dist_prob[j] /= sum;
+                for dp in dist_prob.iter_mut() {
+                    *dp /= sum;
                 }
 
                 // Matches EManager.cpp:697-701: recompute abund_prob
@@ -557,18 +564,18 @@ pub fn classify(state: &mut EmState, params: &EmParams) {
 
                 // Matches EManager.cpp:703-716: combine and normalize seq_prob
                 let mut sum = 0.0f64;
-                for j in 0..seed_num {
-                    state.seq_prob[i][j] = dist_prob[j];
-                    for k in 0..ab_num {
-                        state.seq_prob[i][j] *= abund_prob[j][k];
+                for (j, (&dp, ap_row)) in dist_prob.iter().zip(abund_prob.iter()).enumerate() {
+                    state.seq_prob[i][j] = dp;
+                    for &ap in ap_row {
+                        state.seq_prob[i][j] *= ap;
                     }
                     sum += state.seq_prob[i][j];
                 }
-                for j in 0..seed_num {
-                    state.seq_prob[i][j] /= sum;
+                for sp in state.seq_prob[i].iter_mut() {
+                    *sp /= sum;
                     // Matches EManager.cpp:725-728: NaN handling (sum too small)
-                    if state.seq_prob[i][j] != state.seq_prob[i][j] {
-                        state.seq_prob[i][j] = 0.0;
+                    if sp.is_nan() {
+                        *sp = 0.0;
                     }
                 }
             }
@@ -604,9 +611,9 @@ pub fn write_results(state: &EmState, output_prefix: &str, params: &EmParams) {
     // Matches EManager.cpp:883: sprintf(bin_name[i], "%s.%04d.fasta", outputfile, j)
     let mut bin_names: Vec<Option<String>> = vec![None; seed_num];
     let mut j = 1;
-    for i in 0..seed_num {
-        if state.seed_count[i] > 0 {
-            bin_names[i] = Some(format!("{}.{:04}.fasta", output_prefix, j));
+    for (bn, &count) in bin_names.iter_mut().zip(state.seed_count.iter()) {
+        if count > 0 {
+            *bn = Some(format!("{}.{:04}.fasta", output_prefix, j));
             j += 1;
         }
     }
@@ -617,6 +624,7 @@ pub fn write_results(state: &EmState, output_prefix: &str, params: &EmParams) {
         std::fs::File::create(&summary_path).expect("failed to create summary"),
     );
 
+    #[allow(clippy::needless_range_loop)] // i used as value and multi-array index
     for i in 0..seed_num {
         if state.seed_count[i] > 0 {
             // Matches EManager.cpp:901-907: "Bin [name]\tabundance..."

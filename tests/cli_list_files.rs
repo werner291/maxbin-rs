@@ -24,7 +24,7 @@ fn reads_list_expands_to_paths() {
     writeln!(f, "/data/sample1.fq.gz").unwrap();
     writeln!(f, "/data/sample2.fq.gz").unwrap();
     writeln!(f, "  /data/sample3.fq.gz  ").unwrap(); // whitespace
-    writeln!(f, "").unwrap(); // blank line
+    writeln!(f).unwrap(); // blank line
     let cli = parse(&["-reads_list", f.path().to_str().unwrap()]);
     let files = cli.all_reads_files().unwrap();
     assert_eq!(files.len(), 3);

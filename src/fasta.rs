@@ -10,6 +10,10 @@ impl Record {
     pub fn len(&self) -> usize {
         self.seq.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.seq.is_empty()
+    }
 }
 
 /// Parse FASTA from a reader. Mirrors the behavior of MaxBin2's fastaReader::parse():
@@ -162,9 +166,8 @@ mod tests {
         );
 
         // Field-by-field comparison for every record
-        for i in 0..rust_records.len() {
+        for (i, rust_rec) in rust_records.iter().enumerate() {
             let idx = i as u32;
-            let rust_rec = &rust_records[i];
 
             assert_eq!(
                 rust_rec.header,

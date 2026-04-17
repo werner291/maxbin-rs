@@ -1,22 +1,23 @@
-/// External tool invocations — shelling out to HMMER, Bowtie2, and gene callers.
-///
-/// These replace the Perl orchestration's subprocess calls in run_MaxBin.pl.
-/// Each function wraps a single external tool, handling argument construction
-/// and error reporting.
-///
-/// In the original, run_MaxBin.pl resolves tool paths via:
-///   1. A `setting` file with manual absolute paths (run_MaxBin.pl:~295-360,
-///      checkSetting/checkProgram subroutines)
-///   2. Fallback to $PATH search
-/// Rust finds tools on $PATH only, eliminating the setting file entirely.
-///
-/// KNOWN ISSUES preserved from the original:
-/// - FragGeneScan is designed for short reads, not assembled contigs (SourceForge
-///   ticket #2). Using it on contigs is a misuse that causes slow initialization
-///   and macOS segfaults. Prodigal is the correct tool for assembled contigs.
-/// - The original resolves tool paths via a hand-written `setting` file with
-///   manual absolute paths — a constant source of user pain (Biostars #9473674).
-///   We find tools on $PATH instead.
+//! External tool invocations — shelling out to HMMER, Bowtie2, and gene callers.
+//!
+//! These replace the Perl orchestration's subprocess calls in run_MaxBin.pl.
+//! Each function wraps a single external tool, handling argument construction
+//! and error reporting.
+//!
+//! In the original, run_MaxBin.pl resolves tool paths via:
+//!   1. A `setting` file with manual absolute paths (run_MaxBin.pl:~295-360,
+//!      checkSetting/checkProgram subroutines)
+//!   2. Fallback to $PATH search
+//!
+//! Rust finds tools on $PATH only, eliminating the setting file entirely.
+//!
+//! KNOWN ISSUES preserved from the original:
+//! - FragGeneScan is designed for short reads, not assembled contigs (SourceForge
+//!   ticket #2). Using it on contigs is a misuse that causes slow initialization
+//!   and macOS segfaults. Prodigal is the correct tool for assembled contigs.
+//! - The original resolves tool paths via a hand-written `setting` file with
+//!   manual absolute paths — a constant source of user pain (Biostars #9473674).
+//!   We find tools on $PATH instead.
 use std::path::Path;
 use std::process::Command;
 

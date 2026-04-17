@@ -60,7 +60,7 @@ pub fn parse<R: std::io::BufRead>(reader: R) -> Result<Vec<AbundanceRecord>, Str
         // atof skips leading whitespace before parsing the number, while Rust's
         // f64::parse does not. We trim to match atof behavior — this matters when
         // the && bug leaves a second separator character in value_part (e.g. "\t308.5").
-        let abundance: f64 = value_part.trim_start().parse().unwrap_or_else(|_| {
+        let abundance: f64 = value_part.trim_start().parse().unwrap_or({
             // atof in C returns 0.0 for unparseable strings
             0.0
         });

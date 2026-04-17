@@ -31,7 +31,7 @@ fn fmt_ops(ops: f64) -> String {
     let bytes: Vec<u8> = s.bytes().collect();
     let mut result = String::new();
     for (i, &b) in bytes.iter().enumerate() {
-        if i > 0 && (bytes.len() - i) % 3 == 0 {
+        if i > 0 && (bytes.len() - i).is_multiple_of(3) {
             result.push(',');
         }
         result.push(b as char);
@@ -53,8 +53,8 @@ fn print_row(name: &str, cpp_ops: f64, rust_ops: f64) {
 fn print_header() {
     eprintln!();
     eprintln!(
-        "  {:<30} {:>14} {:>14}    {}",
-        "Component", "C++ (ops/s)", "Rust (ops/s)", "Ratio"
+        "  {:<30} {:>14} {:>14}    Ratio",
+        "Component", "C++ (ops/s)", "Rust (ops/s)"
     );
     eprintln!("  {:-<30} {:-<14} {:-<14}    {:-<6}", "", "", "", "");
 }
