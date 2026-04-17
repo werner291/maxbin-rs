@@ -40,11 +40,15 @@ Version numbers TBD when we get there.
 
 ## Branching
 
-`main` targets the next release. When main moves past a version series
-(e.g., starts v0.2 work), a `release/0.1` branch is created from the
-last v0.1.x tag for any necessary backports.
+`main` should stay in a working state. Work-in-progress goes on feature
+branches and merges to main when it's ready (`--ff-only`). No PR
+ceremony required — the merge is the review.
 
-There is currently one maintainer. Commits go directly to main.
-If contributors appear, this scales to PR-based review naturally —
-the versioning contract stays the same regardless of process.
+When main moves past a version series (e.g., starts v0.2 work), a
+`release/0.1` branch is created from the last v0.1.x tag for any
+necessary backports. Tags mark releases.
+
+There is currently one maintainer. If contributors appear, this scales
+to PR-based review naturally — the versioning contract stays the same
+regardless of process.
 
