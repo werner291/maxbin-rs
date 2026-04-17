@@ -208,6 +208,9 @@
           ];
           config = {
             Entrypoint = [ "${maxbin-rs}/bin/maxbin-rs" ];
+            Labels = {
+              "org.opencontainers.image.source" = "https://github.com/werner291/maxbin-rs";
+            };
           };
         };
 

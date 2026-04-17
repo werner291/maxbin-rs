@@ -97,6 +97,18 @@ lack of ongoing maintenance rather than poor original engineering.
 - [ ] 2025 benchmark (Nature Comms, PMC11933696): MetaBAT2 competitive with deep learning
   binners while finishing in minutes; MaxBin2 not separately benchmarked but known slower
 
+### Code quality
+
+- [ ] Replace hand-rolled CLI parsing (~1000 lines in `cli.rs`) with clap derive.
+  Clap doesn't support MaxBin2's single-dash long flags (`-contig`), so preprocess
+  argv to rewrite `-contig` → `--contig` before clap sees it. Keeps backwards
+  compatibility, eliminates most of the parsing code.
+
+### Testing
+
+- [x] Pipeline stage tests are now sandboxed Nix derivations (`runCommand`).
+  ~~Could silently pick up files from the host.~~
+
 ## Plan
 
 1. **Nix flake** — package the original MaxBin2 + all deps reproducibly. Useful immediately,
