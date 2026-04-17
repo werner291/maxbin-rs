@@ -1,5 +1,15 @@
 # maxbin-rs
 
+**Status: Work in progress.** Component-level equivalence is verified via
+FFI tests (112 tests), and end-to-end output matches on small datasets.
+Recursive binning is implemented but has a known 9-contig divergence on
+larger metagenomes due to float precision differences. Reads format
+detection has edge cases that can silently produce wrong results.
+**Do not use in production pipelines or spend significant time testing yet.** 
+If you want to experiment, please report issues.
+
+---
+
 A Rust reimplementation of [MaxBin2](https://sourceforge.net/projects/maxbin2/),
 a metagenome binning tool that clusters assembled contigs into individual genomes
 using tetranucleotide frequency and abundance information.
@@ -14,13 +24,6 @@ without the original MaxBin2.
 For a detailed account of how this rewrite was done and verified, see
 [PAPER.md](PAPER.md).
 
-**Status: Work in progress.** Component-level equivalence is verified via
-FFI tests (112 tests), and end-to-end output matches on small datasets.
-Recursive binning is implemented but has a known 9-contig divergence on
-larger metagenomes due to float precision differences. Reads format
-detection has edge cases that can silently produce wrong results.
-**Do not use in production pipelines yet.** If you want to experiment,
-please report issues.
 
 ## Quick start
 
