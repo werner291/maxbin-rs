@@ -347,6 +347,17 @@
             HOOK
             chmod +x .git/hooks/pre-commit
 
+            # Pre-push hook: check formatting, clippy, and tests
+            cat > .git/hooks/pre-push <<'HOOK'
+            #!/bin/sh
+            echo "Running pre-push checks..."
+            cargo fmt --check || { echo "cargo fmt failed"; exit 1; }
+            cargo clippy --tests -- -D warnings || { echo "clippy failed"; exit 1; }
+            cargo nextest run || { echo "tests failed"; exit 1; }
+            echo "Pre-push checks passed."
+            HOOK
+            chmod +x .git/hooks/pre-push
+
             echo "maxbin-rs devshell"
             echo "  maxbin2 (original): $(run_MaxBin.pl -v 2>&1 | head -1 || echo 'available')"
             echo "  test contigs: $MAXBIN2_TEST_CONTIGS"
