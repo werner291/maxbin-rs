@@ -30,6 +30,9 @@ jobs:
       - name: Format check
         run: nix develop -c cargo fmt --check
 
+      - name: Pipeline equivalence test (B. fragilis)
+        run: nix build .#test-pipeline-stages
+
       - name: Docker VM test
         run: |
           sudo chmod 666 /dev/kvm

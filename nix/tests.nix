@@ -32,31 +32,34 @@
 }:
 
 let
-  # Helper: create a pipeline stage test for a given dataset.
-  # All three tests run the same script (tests/pipeline-stages.sh) with
-  # different data — the script doesn't know or care which dataset it gets.
+  # Helper: create a sandboxed pipeline stage test for a given dataset.
+  # Runs tests/pipeline-stages.sh inside the Nix build sandbox — isolated
+  # filesystem, no network, no host environment variables. The only tools
+  # available are those explicitly listed in PATH below.
   mkStageTest =
     {
       name,
       dataset,
       intermediates',
     }:
-    writeShellApplication {
-      name = "test-pipeline-stages-${name}";
-      # Both the original MaxBin2 and maxbin-rs are on $PATH during the test,
-      # so the script can invoke either.
-      runtimeInputs = [
-        maxbin2
-        maxbin-rs
-      ];
-      text = ''
-        # INTERMEDIATES: path to pre-computed outputs from the original MaxBin2
+    runCommand "test-pipeline-stages-${name}"
+      {
+        nativeBuildInputs = [
+          maxbin2
+          maxbin-rs
+        ];
+      }
+      ''
         export INTERMEDIATES="${intermediates'}"
-        # MAXBIN2_TEST_CONTIGS: the raw input contigs for this dataset
         export MAXBIN2_TEST_CONTIGS="${dataset.contigs}"
-        exec ${../tests/pipeline-stages.sh}
+        export MAXBIN_RS_DETERMINISTIC=1
+        export HOME=$(mktemp -d)
+
+        bash ${../tests/pipeline-stages.sh}
+
+        # runCommand requires an output — touch $out to signal success.
+        touch $out
       '';
-    };
 in
 {
   test-pipeline-stages = mkStageTest {
