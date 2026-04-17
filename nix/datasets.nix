@@ -20,7 +20,8 @@ let
 
   # --- minigut (nf-core/mag test profile) ---
   minigutBase = "https://raw.githubusercontent.com/nf-core/test-datasets/mag";
-in {
+in
+{
   bfragilis = {
     contigs = fetchurl {
       url = "${nfcoreBase}/fasta/test1.contigs.fa.gz";

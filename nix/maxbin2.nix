@@ -13,7 +13,16 @@
 # generate cached intermediate files, then compare the Rust reimplementation
 # against those outputs.
 
-{ lib, stdenv, perl, hmmer, bowtie2, fraggenescan, makeWrapper, src }:
+{
+  lib,
+  stdenv,
+  perl,
+  hmmer,
+  bowtie2,
+  fraggenescan,
+  makeWrapper,
+  src,
+}:
 
 stdenv.mkDerivation rec {
   pname = "maxbin2";
@@ -40,44 +49,44 @@ stdenv.mkDerivation rec {
   '';
 
   installPhase = ''
-    mkdir -p $out/bin $out/libexec/maxbin2/src
+        mkdir -p $out/bin $out/libexec/maxbin2/src
 
-    # Install the C++ binary — must be at src/MaxBin relative to the Perl
-    # scripts because run_MaxBin.pl hardcodes: $MAXBIN = "$Bin/src/MaxBin"
-    cp src/MaxBin $out/libexec/maxbin2/src/
+        # Install the C++ binary — must be at src/MaxBin relative to the Perl
+        # scripts because run_MaxBin.pl hardcodes: $MAXBIN = "$Bin/src/MaxBin"
+        cp src/MaxBin $out/libexec/maxbin2/src/
 
-    # Install Perl scripts
-    cp run_MaxBin.pl $out/libexec/maxbin2/
-    cp _getmarker.pl $out/libexec/maxbin2/
-    cp _getabund.pl $out/libexec/maxbin2/
-    cp _sepReads.pl $out/libexec/maxbin2/
-    chmod +x $out/libexec/maxbin2/run_MaxBin.pl
+        # Install Perl scripts
+        cp run_MaxBin.pl $out/libexec/maxbin2/
+        cp _getmarker.pl $out/libexec/maxbin2/
+        cp _getabund.pl $out/libexec/maxbin2/
+        cp _sepReads.pl $out/libexec/maxbin2/
+        chmod +x $out/libexec/maxbin2/run_MaxBin.pl
 
-    # Install HMM marker gene databases
-    cp marker.hmm $out/libexec/maxbin2/
-    cp bacar_marker.hmm $out/libexec/maxbin2/
+        # Install HMM marker gene databases
+        cp marker.hmm $out/libexec/maxbin2/
+        cp bacar_marker.hmm $out/libexec/maxbin2/
 
-    # Install R heatmap script
-    cp heatmap.r $out/libexec/maxbin2/
+        # Install R heatmap script
+        cp heatmap.r $out/libexec/maxbin2/
 
-    # Generate the setting file pointing to Nix store paths.
-    # The regex in checkProgram() does NOT tolerate leading whitespace.
-    cat > $out/libexec/maxbin2/setting <<EOF
-[FragGeneScan] ${fraggenescan}/libexec/FragGeneScan
-[Bowtie2] ${bowtie2}/bin
-[HMMER3] ${hmmer}/bin
-EOF
+        # Generate the setting file pointing to Nix store paths.
+        # The regex in checkProgram() does NOT tolerate leading whitespace.
+        cat > $out/libexec/maxbin2/setting <<EOF
+    [FragGeneScan] ${fraggenescan}/libexec/FragGeneScan
+    [Bowtie2] ${bowtie2}/bin
+    [HMMER3] ${hmmer}/bin
+    EOF
 
-    # Create wrapper that sets up PATH so the Perl script can find all tools.
-    # run_MaxBin.pl uses FindBin to locate sibling scripts and data files
-    # relative to $Bin, so the wrapper must exec the real script (makeWrapper
-    # does this correctly — $0 in Perl resolves through the wrapper).
-    makeWrapper $out/libexec/maxbin2/run_MaxBin.pl $out/bin/run_MaxBin.pl \
-      --prefix PATH : "${hmmer}/bin" \
-      --prefix PATH : "${bowtie2}/bin" \
-      --prefix PATH : "${fraggenescan}/libexec/FragGeneScan" \
-      --prefix PATH : "$out/libexec/maxbin2" \
-      --prefix PATH : "${perl}/bin"
+        # Create wrapper that sets up PATH so the Perl script can find all tools.
+        # run_MaxBin.pl uses FindBin to locate sibling scripts and data files
+        # relative to $Bin, so the wrapper must exec the real script (makeWrapper
+        # does this correctly — $0 in Perl resolves through the wrapper).
+        makeWrapper $out/libexec/maxbin2/run_MaxBin.pl $out/bin/run_MaxBin.pl \
+          --prefix PATH : "${hmmer}/bin" \
+          --prefix PATH : "${bowtie2}/bin" \
+          --prefix PATH : "${fraggenescan}/libexec/FragGeneScan" \
+          --prefix PATH : "$out/libexec/maxbin2" \
+          --prefix PATH : "${perl}/bin"
   '';
 
   meta = with lib; {

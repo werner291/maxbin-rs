@@ -38,18 +38,27 @@
 
   # `outputs` defines what this flake produces. The `eachDefaultSystem` call
   # generates packages for Linux and macOS automatically.
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      rust-overlay,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
           # FragGeneScan has no explicit license file — allow it here.
-          config.allowUnfreePredicate = pkg:
-            builtins.elem (nixpkgs.lib.getName pkg) [ "fraggenescan" ];
+          config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "fraggenescan" ];
         };
         rust = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ];
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+          ];
         };
 
         # =====================================================================
@@ -85,7 +94,12 @@
           # at runtime — no manual 'setting' file needed.
           postInstall = ''
             wrapProgram $out/bin/maxbin-rs \
-              --prefix PATH : "${pkgs.lib.makeBinPath [ pkgs.hmmer pkgs.bowtie2 ]}:${fraggenescan}/libexec/FragGeneScan"
+              --prefix PATH : "${
+                pkgs.lib.makeBinPath [
+                  pkgs.hmmer
+                  pkgs.bowtie2
+                ]
+              }:${fraggenescan}/libexec/FragGeneScan"
           '';
           nativeBuildInputs = [ pkgs.makeWrapper ];
         };
@@ -101,7 +115,12 @@
           MAXBIN2_CPP_LTO = "1";
           postInstall = ''
             wrapProgram $out/bin/maxbin-rs \
-              --prefix PATH : "${pkgs.lib.makeBinPath [ pkgs.hmmer pkgs.bowtie2 ]}:${fraggenescan}/libexec/FragGeneScan"
+              --prefix PATH : "${
+                pkgs.lib.makeBinPath [
+                  pkgs.hmmer
+                  pkgs.bowtie2
+                ]
+              }:${fraggenescan}/libexec/FragGeneScan"
           '';
           nativeBuildInputs = [ pkgs.makeWrapper ];
         };
@@ -144,13 +163,13 @@
             name = "cami-i-high";
             contigs = datasets.cami-i-high.contigs;
             depth = datasets.cami-i-high.depth;
-            depthFormat = "metabat";  # NERSC MetaBAT depth format
+            depthFormat = "metabat"; # NERSC MetaBAT depth format
           };
           metahit = intermediatesLib.mkPipelineIntermediatesFromAbund {
             name = "metahit";
             contigs = datasets.metahit.contigs;
             depth = datasets.metahit.depth;
-            depthFormat = "maxbin";   # Already in MaxBin format
+            depthFormat = "maxbin"; # Already in MaxBin format
           };
         };
 
@@ -160,39 +179,73 @@
 
         tests = import ./nix/tests.nix {
           inherit (pkgs) writeShellApplication runCommand binutils-unwrapped;
-          inherit maxbin2 maxbin-rs maxbin-rs-lto rust;
+          inherit
+            maxbin2
+            maxbin-rs
+            maxbin-rs-lto
+            rust
+            ;
           inherit (pkgs) cargo-nextest;
           inherit datasets intermediates;
         };
 
-      in {
+      in
+      {
         # Everything listed here can be built with `nix build .#<name>`
         # or run with `nix run .#<name>`.
         packages = {
           default = maxbin-rs;
           inherit maxbin-rs maxbin2 fraggenescan;
-          inherit (intermediates) bfragilis minigut capes cami metahit;
+          inherit (intermediates)
+            bfragilis
+            minigut
+            capes
+            cami
+            metahit
+            ;
           inherit (tests)
-            test-pipeline-stages test-pipeline-stages-minigut
-            test-pipeline-stages-capes test-pipeline-stages-cami
-            test-pipeline-stages-metahit bench-components bench-cpp-lto
-            disasm-em;
+            test-pipeline-stages
+            test-pipeline-stages-minigut
+            test-pipeline-stages-capes
+            test-pipeline-stages-cami
+            test-pipeline-stages-metahit
+            bench-components
+            bench-cpp-lto
+            disasm-em
+            ;
         };
 
         # `nix develop` drops you into this shell with all tools available.
         devShells.default = pkgs.mkShell {
-          buildInputs = [ rust pkgs.cargo-nextest pkgs.gh pkgs.cachix maxbin2 ];
+          buildInputs = [
+            rust
+            pkgs.cargo-nextest
+            pkgs.gh
+            pkgs.cachix
+            maxbin2
+          ];
           # Environment variables available inside the devshell:
           MAXBIN2_TEST_CONTIGS = "${datasets.bfragilis.contigs}";
           MAXBIN2_TEST_READS1 = "${datasets.bfragilis.reads1}";
           MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
           shellHook = ''
             export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
+
+            # Auto-format pre-commit hook
+            mkdir -p .git/hooks
+            cat > .git/hooks/pre-commit <<'HOOK'
+            #!/bin/sh
+            cargo fmt
+            git add -u -- '*.rs'
+            HOOK
+            chmod +x .git/hooks/pre-commit
+
             echo "maxbin-rs devshell"
             echo "  maxbin2 (original): $(run_MaxBin.pl -v 2>&1 | head -1 || echo 'available')"
             echo "  test contigs: $MAXBIN2_TEST_CONTIGS"
             echo "  test reads:   $MAXBIN2_TEST_READS1"
           '';
         };
-      });
+      }
+    );
 }

@@ -5,7 +5,12 @@
 # genes with HMMER. This is 2010-era C code that requires a compiler flag
 # workaround to build with modern GCC (see NIX_CFLAGS_COMPILE below).
 
-{ lib, stdenv, fetchurl, perl }:
+{
+  lib,
+  stdenv,
+  fetchurl,
+  perl,
+}:
 
 stdenv.mkDerivation rec {
   pname = "fraggenescan";
