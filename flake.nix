@@ -93,6 +93,8 @@
           # Wrap the binary so HMMER, Bowtie2, and FragGeneScan are on $PATH
           # at runtime — no manual 'setting' file needed.
           postInstall = ''
+            cp ${maxbin2}/libexec/maxbin2/marker.hmm $out/bin/
+            cp ${maxbin2}/libexec/maxbin2/bacar_marker.hmm $out/bin/
             wrapProgram $out/bin/maxbin-rs \
               --prefix PATH : "${
                 pkgs.lib.makeBinPath [
@@ -196,10 +198,22 @@
           contents = [
             maxbin-rs
             pkgs.coreutils
+            pkgs.bashInteractive
+            pkgs.gawk
+            # Bowtie2's Perl wrapper shells out via /bin/sh
+            (pkgs.runCommand "sh-symlink" { } ''
+              mkdir -p $out/bin
+              ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
+            '')
           ];
           config = {
             Entrypoint = [ "${maxbin-rs}/bin/maxbin-rs" ];
           };
+        };
+
+        # NixOS VM test — run the Docker image on real data.
+        dockerTest = import ./nix/docker-test.nix {
+          inherit pkgs dockerImage datasets;
         };
 
       in
@@ -213,6 +227,7 @@
             maxbin2
             fraggenescan
             dockerImage
+            dockerTest
             ;
           inherit (intermediates)
             bfragilis

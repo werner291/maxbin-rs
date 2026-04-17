@@ -110,16 +110,16 @@ pub fn run_hmmsearch(
 /// Build a Bowtie2 index from a contig file.
 /// Matches run_MaxBin.pl:~385-395: `bowtie2-build $contig $out_f.idx`
 pub fn bowtie2_build(contig: &Path, index_prefix: &str) -> Result<(), String> {
-    let status = Command::new("bowtie2-build")
+    let output = Command::new("bowtie2-build")
         .arg(contig)
         .arg(index_prefix)
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
+        .output()
         .map_err(|e| format!("Failed to run bowtie2-build: {e}"))?;
 
-    if !status.success() {
-        return Err("bowtie2-build failed.".into());
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("bowtie2-build failed:\n{stderr}"));
     }
     Ok(())
 }
@@ -150,15 +150,15 @@ pub fn bowtie2_map(
         cmd.arg("-f");
     }
 
-    cmd.stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
+    cmd.stdout(std::process::Stdio::null());
 
-    let status = cmd
-        .status()
+    let output = cmd
+        .output()
         .map_err(|e| format!("Failed to run bowtie2: {e}"))?;
 
-    if !status.success() {
-        return Err("bowtie2 mapping failed.".into());
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("bowtie2 mapping failed:\n{stderr}"));
     }
     Ok(())
 }
