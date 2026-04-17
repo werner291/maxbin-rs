@@ -399,6 +399,8 @@
             installPhase = "touch $out";
             dontFixup = true;
           });
+          inherit (tests) test-pipeline-stages test-cli test-cli-equivalence;
+          inherit dockerTest;
         };
       }
     );

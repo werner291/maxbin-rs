@@ -21,22 +21,8 @@ jobs:
           name: maxbin-rs
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Build
-        run: nix build
-
-      - name: Checks (fmt, clippy, tests)
-        run: nix flake check
-
-      - name: Pipeline equivalence test (B. fragilis)
-        run: nix build .#test-pipeline-stages
-
-      - name: CLI integration tests (B. fragilis)
-        run: nix build .#test-cli
-
-      - name: CLI equivalence tests (B. fragilis)
-        run: nix build .#test-cli-equivalence
-
-      - name: Docker VM test
+      - name: Build and check
         run: |
+          nix build
           sudo chmod 666 /dev/kvm
-          nix build .#dockerTest
+          nix flake check
