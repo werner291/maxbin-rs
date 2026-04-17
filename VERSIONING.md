@@ -1,12 +1,13 @@
 # Versioning
 
-maxbin-rs follows [Semantic Versioning](https://semver.org/) with one
-domain-specific clarification: **"breaking change" means "changes binning
-output on the same input."**
+maxbin-rs uses version numbers inspired by [Semantic Versioning](https://semver.org/),
+but adapted to a bioinformatics tool where the API contract is the binning
+output, not a programming interface. **"Breaking change" means "changes
+binning output on the same input."**
 
-Pipeline users care about reproducibility. A crash fix or a better error
-message is not breaking. A different default threshold that changes which
-contigs end up in which bin is.
+A crash fix, a better error message, or a new CLI flag is not breaking.
+A different default threshold that changes which contigs end up in which
+bin is.
 
 ## Version series
 
