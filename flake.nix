@@ -222,6 +222,7 @@
             pkgs.cargo-nextest
             pkgs.gh
             pkgs.cachix
+            pkgs.nixfmt-rfc-style
             maxbin2
           ];
           # Environment variables available inside the devshell:
@@ -237,6 +238,8 @@
             #!/bin/sh
             cargo fmt
             git add -u -- '*.rs'
+            nixfmt flake.nix nix/*.nix
+            git add -u -- '*.nix'
             HOOK
             chmod +x .git/hooks/pre-commit
 
