@@ -37,12 +37,14 @@ Readers who consider either point disqualifying are welcome to stop here.
 I present a Rust reimplementation of MaxBin2, a widely-used metagenome
 binning tool. This case study touches on three topics: equivalence-first
 rewriting as a methodology, Nix-based reproducibility, and LLM-assisted
-development in practice. The reimplementation produces identical final output to the original on
-all tested datasets. Intermediate pipeline stages are byte-identical
+development in practice. Intermediate pipeline stages are byte-identical
 for the EM core, within floating-point tolerance for abundance
-computations, and identical as sets for seed selection. The original
-uses long double (80-bit on x86-64); the Rust reimplementation uses f64. Known
-bugs are reproduced intentionally.
+computations, and identical as sets for seed selection. End-to-end
+output matches on small datasets; on a 5000-contig subset of the
+CAMI I High metagenome benchmark, 9 contigs are classified differently
+due to float precision (`long double` vs `f64`) compounding through
+5 levels of recursive binning. Known bugs are reproduced
+intentionally.
 
 I extend the rewrites.bio approach by introducing Nix as a packaging and
 reproducibility layer. The original MaxBin2 can be installed via Conda,
@@ -385,8 +387,9 @@ on the Rust side):
 | Rust with `f64` | 231s | <1s | <1s | ~3.9 min |
 
 The C++ uses `long double` (80-bit x87 on this platform) while Rust
-uses `f64` (64-bit IEEE 754). Bin assignments were identical across all
-tested datasets despite the precision difference.
+uses `f64` (64-bit IEEE 754). On a single EM pass, bin assignments are
+identical. The precision difference manifests through recursive binning
+(see [Discussion](#nondeterminism-and-float-precision)).
 
 I did not expect an ~8x gap and spent considerable effort trying to
 close it from the C++ side. I stripped all `sprintf` and logging calls
@@ -552,9 +555,14 @@ it is the biggest remaining performance opportunity.
 
 ## Conclusion
 
-The reimplementation produces identical output to the original MaxBin2
-on four tested datasets (up to 36K contigs), is ~8x faster on the EM
-core, and is installable with a single `nix run` command. The equivalence-first methodology —
+The reimplementation produces near-identical output to the original
+MaxBin2. Component-level equivalence is byte-exact; end-to-end output
+matches on small datasets. On a downsampled subset of the CAMI I High
+benchmark (5000 contigs), recursive binning produces the same 114 bins,
+with 9 contigs classified differently due to a float precision
+difference between the two implementations (`long double` vs `f64`).
+The EM core is ~8x faster and the tool is installable with a single
+`nix run` command. The equivalence-first methodology —
 match the original's output, bugs included, then fix things separately
 — made the project tractable without domain expertise. Whether that
 generalizes to other bioinformatics tools in similar situations remains

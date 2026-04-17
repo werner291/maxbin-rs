@@ -14,10 +14,13 @@ without the original MaxBin2.
 For a detailed account of how this rewrite was done and verified, see
 [PAPER.md](PAPER.md).
 
-**Status:** Pipeline stage equivalence verified on four datasets (B. fragilis,
-minigut, CAPES_S7, CAMI I High). Component-level equivalence verified via
-proptest + FFI against the original C++ (109 tests). See [Verifying the claims](#verifying-the-claims)
-below.
+**Status: Work in progress.** Component-level equivalence is verified via
+FFI tests (112 tests), and end-to-end output matches on small datasets.
+Recursive binning is implemented but has a known 9-contig divergence on
+larger metagenomes due to float precision differences. Reads format
+detection has edge cases that can silently produce wrong results.
+**Do not use in production pipelines yet.** If you want to experiment,
+please report issues.
 
 ## Quick start
 
