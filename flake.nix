@@ -189,13 +189,31 @@
           inherit datasets intermediates;
         };
 
+        # Docker image for ghcr.io — minimal, just the wrapped binary.
+        dockerImage = pkgs.dockerTools.buildLayeredImage {
+          name = "ghcr.io/werner291/maxbin-rs";
+          tag = "latest";
+          contents = [
+            maxbin-rs
+            pkgs.coreutils
+          ];
+          config = {
+            Entrypoint = [ "${maxbin-rs}/bin/maxbin-rs" ];
+          };
+        };
+
       in
       {
         # Everything listed here can be built with `nix build .#<name>`
         # or run with `nix run .#<name>`.
         packages = {
           default = maxbin-rs;
-          inherit maxbin-rs maxbin2 fraggenescan;
+          inherit
+            maxbin-rs
+            maxbin2
+            fraggenescan
+            dockerImage
+            ;
           inherit (intermediates)
             bfragilis
             minigut
