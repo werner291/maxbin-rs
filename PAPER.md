@@ -1,7 +1,7 @@
 # Rewriting MaxBin2 in Rust: A Case Study in Equivalence-First Bioinformatics Rewrites
 
 **Werner Kroneman, April 2026**\
-**Applies to: v0.1.0 (`13b026f`)**
+**Applies to: v0.1.2**
 
 ## Disclosure
 
@@ -465,19 +465,17 @@ ultimately abandoned — no built-in equivalent exists, and the effort
 was disproportionate. The equivalence tests accept floating-point
 tolerance instead.
 
-A separate issue: the original C++ uses `long double` for all EM
-probability computations. `long double` is not the same type across
-platforms — 80-bit on x86-64 Linux
-([System V AMD64 ABI](https://www.uclibc.org/docs/psABI-x86_64.pdf)),
-128-bit on ARM64 Linux
-([AAPCS64](https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst)),
-64-bit on macOS Apple Silicon and Windows
-([Microsoft docs](https://learn.microsoft.com/en-us/cpp/cpp/fundamental-types-cpp)).
-Rust has no `long double` equivalent — `f64` (64-bit IEEE 754) is the
-widest float type on stable Rust
-([`f128` exists on nightly](https://github.com/rust-lang/rust/issues/116909)
-but is not yet stable). Bin assignments are identical despite the
-precision difference — the equivalence tests verify this.
+A separate issue: the original C++ uses `long double` (80-bit on
+x86-64 Linux, 64-bit on macOS/Windows) for EM probability
+computations. Rust uses `f64` (64-bit everywhere). On a single EM
+pass, bin assignments are identical. Through 5 levels of recursive
+binning, the precision difference affects 9 out of 5000 contigs on
+downsampled CAMI I High — all from a single degenerate sub-bin where
+the EM converges to 0.5 ± 1e-16 and classification hinges on the
+16th decimal digit (`nix build .#test-precision-divergence`). Since
+`long double` is 64-bit on macOS and Windows, the original is likely
+susceptible to similar platform-dependent divergence on degenerate
+inputs.
 
 ### Working with LLMs
 
@@ -491,6 +489,24 @@ broken code works if presented confidently; fresh-context subagents
 (separate invocations that see only the code, not the conversation)
 helped catch this. Throughout, the LLM had to be repeatedly redirected
 away from "improving" the original rather than reproducing it.
+
+The most significant failure: the original MaxBin2's Perl orchestration
+runs the EM algorithm *recursively* — each output bin is re-seeded from
+the HMMER results and re-run through the EM, up to 5 levels deep. This
+recursive splitting is the core of MaxBin2's bin refinement. The LLM
+translated the C++ EM core faithfully, but never implemented the Perl
+loop that calls it repeatedly. I did not catch this either. The
+component-level equivalence tests all passed — they test each stage in
+isolation, not the orchestration between stages. The gap was only
+discovered the next day when end-to-end CLI equivalence tests were added
+that run both tools on the same input and compare output. By that point
+I had already announced the tool on the nf-core/mag Slack channel.
+
+This is a structural weakness of LLM-assisted rewrites: the LLM excels
+at translating individual functions but can miss higher-level control
+flow that spans files (in this case, a Perl `while` loop that
+coordinates multiple calls to a C++ binary). Component tests verify
+each piece works; only integration tests verify the whole.
 
 LLM reviewer agents are sensitive to prompt framing — adversarial
 prompts find overclaims, neutral prompts find the same gaps but frame

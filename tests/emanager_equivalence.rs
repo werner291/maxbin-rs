@@ -103,3 +103,115 @@ fn emanager_cpp_vs_rust() {
 
     let _ = std::fs::remove_dir_all(&test_dir);
 }
+
+/// Regression test: a 14-contig sub-bin from CAMI I High (depth 4 of
+/// recursive binning) where the Rust EM and C++ EM diverge.
+///
+/// With `long double` (C++) vs `f64` (Rust), the probability threshold
+/// cutoff lands differently: C++ classifies 0/14 contigs (all noclass),
+/// Rust classifies 13/14 into a bin.
+///
+/// This test documents the known precision divergence. It uses real
+/// metagenomics data extracted from the CAMI I High benchmark.
+#[test]
+fn emanager_precision_divergence_cami_depth4() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/divergent-em");
+
+    let fasta_path = fixture.join("contigs.fa");
+    let abund_path = fixture.join("abund");
+    let seed_path = fixture.join("seed");
+
+    // Verify fixture exists
+    assert!(fasta_path.exists(), "fixture contigs.fa missing");
+    assert!(abund_path.exists(), "fixture abund missing");
+    assert!(seed_path.exists(), "fixture seed missing");
+
+    let test_dir = std::env::temp_dir().join("maxbin_rs_divergence_test");
+    let _ = std::fs::remove_dir_all(&test_dir);
+    std::fs::create_dir_all(&test_dir).unwrap();
+
+    let seeds: Vec<String> = std::fs::read_to_string(&seed_path)
+        .unwrap()
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(String::from)
+        .collect();
+    assert_eq!(seeds.len(), 2, "expected 2 seeds");
+
+    // Run C++ EManager via FFI
+    let cpp_prefix = test_dir.join("cpp").to_str().unwrap().to_string();
+    {
+        let em =
+            maxbin_rs::original_ffi::OriginalEManager::new(&fasta_path, &abund_path, &cpp_prefix);
+        em.set_thread_num(1);
+        let rc = em.run(&seed_path);
+        assert_eq!(rc, 0, "C++ EManager returned error");
+    }
+
+    // Run Rust EManager
+    let rust_prefix = test_dir.join("rust").to_str().unwrap().to_string();
+    {
+        let params = maxbin_rs::emanager::EmParams::default();
+        let abund_ref: &Path = &abund_path;
+        maxbin_rs::emanager::run_pipeline(&fasta_path, &[abund_ref], &seeds, &rust_prefix, &params);
+    }
+
+    // Count bins produced by each
+    let cpp_bins: Vec<_> = std::fs::read_dir(&test_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            name.starts_with("cpp.") && name.ends_with(".fasta")
+        })
+        .collect();
+    let rust_bins: Vec<_> = std::fs::read_dir(&test_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            name.starts_with("rust.") && name.ends_with(".fasta")
+        })
+        .collect();
+
+    eprintln!(
+        "Precision divergence test: C++ produced {} bins, Rust produced {} bins",
+        cpp_bins.len(),
+        rust_bins.len()
+    );
+
+    // Document the known divergence: C++ classifies 0 contigs, Rust classifies 13.
+    // This is caused by long double (80-bit) vs f64 (64-bit) precision in the
+    // probability computation. On this marginal 14-contig sub-bin, the threshold
+    // cutoff (0.5) lands differently.
+    //
+    // If this test starts PASSING (both produce the same output), it means the
+    // precision gap has been closed — update this test to assert equality.
+    if cpp_bins.len() == rust_bins.len() {
+        eprintln!("UNEXPECTED: C++ and Rust agree! Precision gap may be closed.");
+        // Verify they actually match
+        for suffix in &["noclass", "0001.fasta"] {
+            let rust_file = format!("{}.{}", rust_prefix, suffix);
+            let cpp_file = format!("{}.{}", cpp_prefix, suffix);
+            let rust_bytes = std::fs::read(&rust_file).unwrap_or_default();
+            let cpp_bytes = std::fs::read(&cpp_file).unwrap_or_default();
+            assert_eq!(rust_bytes, cpp_bytes, "{} differs", suffix);
+        }
+    } else {
+        // Known divergence — document but don't fail
+        eprintln!(
+            "Known precision divergence: C++ {} bins, Rust {} bins (long double vs f64)",
+            cpp_bins.len(),
+            rust_bins.len()
+        );
+        // Assert the specific known behavior so we notice if it changes
+        assert_eq!(cpp_bins.len(), 0, "C++ should produce 0 bins on this input");
+        assert_eq!(
+            rust_bins.len(),
+            1,
+            "Rust should produce 1 bin on this input"
+        );
+    }
+
+    let _ = std::fs::remove_dir_all(&test_dir);
+}

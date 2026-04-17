@@ -100,6 +100,8 @@ pub struct SeedsArgs {
     pub min_contig_length: usize,
     #[arg(long, default_value_t = 107)]
     pub markerset: u32,
+    #[arg(long, default_value_t = false)]
+    pub no_max_effort: bool,
 }
 
 #[derive(Debug, Args)]
@@ -164,6 +166,9 @@ pub struct PipelineArgs {
     pub verbose: bool,
     #[arg(long)]
     pub preserve_intermediate: bool,
+    /// Pre-computed HMMER output — skips gene calling and HMMER when provided.
+    #[arg(long)]
+    pub hmmout: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

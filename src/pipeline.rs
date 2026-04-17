@@ -5,8 +5,8 @@
 /// 2. Map reads to contigs (if reads provided instead of abundance)
 /// 3. Run gene caller (FragGeneScan or Prodigal) on contigs
 /// 4. Run HMMER to find marker genes
-/// 5. Generate seed file from marker gene clusters
-/// 6. Run EM algorithm
+/// 5. Recursive binning: seed → EM → re-seed output bins → repeat (up to 5 levels)
+/// 6. Merge noclass, filter small bins, sort by abundance
 /// 7. Write output files
 use crate::cli::{
     CppEmArgs, EmArgs, FilterArgs, GeneCaller, PipelineArgs, SamToAbundArgs, SeedsArgs,
@@ -267,7 +267,7 @@ pub fn run_seeds(args: &SeedsArgs) -> Result<(), String> {
         &seed_file,
         false,
     );
-    if seed_result.is_err() {
+    if seed_result.is_err() && !args.no_max_effort {
         eprintln!("  try harder to dig out marker genes from contigs.");
         generate_seeds(
             &args.hmmout,
@@ -276,6 +276,8 @@ pub fn run_seeds(args: &SeedsArgs) -> Result<(), String> {
             &seed_file,
             true,
         )?;
+    } else if seed_result.is_err() {
+        return seed_result;
     }
     let seed_count = std::fs::read_to_string(&seed_file)
         .map(|s| s.lines().filter(|l| !l.trim().is_empty()).count())
@@ -425,75 +427,58 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         return Err("No abundance information available.".into());
     }
 
-    // Step 3: Gene calling
-    let faa_path = match cli.gene_caller {
-        GeneCaller::Fraggenescan => {
-            eprintln!("Running FragGeneScan...");
-            let prefix = filtered_contigs.display().to_string();
-            crate::external::run_fraggenescan(&filtered_contigs, &prefix, cli.thread)?;
-            PathBuf::from(format!("{prefix}.frag.faa"))
-        }
-        GeneCaller::Prodigal => {
-            eprintln!("Running Prodigal...");
-            let prefix = filtered_contigs.display().to_string();
-            crate::external::run_prodigal(&filtered_contigs, &prefix)?;
-            PathBuf::from(format!("{prefix}.faa"))
-        }
+    // Steps 3-4: Gene calling + HMMER marker gene search
+    // When -hmmout is provided, skip gene calling and HMMER entirely —
+    // use the pre-computed HMMER output directly.
+    let marker_hmm = find_marker_hmm(cli)?;
+    let (hmmout, faa_path) = if let Some(ref user_hmmout) = cli.hmmout {
+        eprintln!("Using pre-computed HMMER output: {}", user_hmmout.display());
+        let hmm_hit_count = std::fs::read_to_string(user_hmmout)
+            .map(|s| s.lines().filter(|l| !l.starts_with('#')).count())
+            .unwrap_or(0);
+        eprintln!("  {} hits", hmm_hit_count);
+        (user_hmmout.clone(), None)
+    } else {
+        // Step 3: Gene calling
+        let faa = match cli.gene_caller {
+            GeneCaller::Fraggenescan => {
+                eprintln!("Running FragGeneScan...");
+                let prefix = filtered_contigs.display().to_string();
+                crate::external::run_fraggenescan(&filtered_contigs, &prefix, cli.thread)?;
+                PathBuf::from(format!("{prefix}.frag.faa"))
+            }
+            GeneCaller::Prodigal => {
+                eprintln!("Running Prodigal...");
+                let prefix = filtered_contigs.display().to_string();
+                crate::external::run_prodigal(&filtered_contigs, &prefix)?;
+                PathBuf::from(format!("{prefix}.faa"))
+            }
+        };
+
+        // Step 4: HMMER marker gene search
+        let hmmout_path = PathBuf::from(format!("{}.hmmout", filtered_contigs.display()));
+        eprintln!(
+            "Running HMMER hmmsearch (marker HMM: {})...",
+            marker_hmm.display()
+        );
+        crate::external::run_hmmsearch(&faa, &marker_hmm, &hmmout_path, cli.thread, cli.markerset)?;
+
+        let hmm_hit_count = std::fs::read_to_string(&hmmout_path)
+            .map(|s| s.lines().filter(|l| !l.starts_with('#')).count())
+            .unwrap_or(0);
+        eprintln!("  HMMER produced {} hits", hmm_hit_count);
+        (hmmout_path, Some(faa))
     };
 
-    // Step 4: HMMER marker gene search
-    let marker_hmm = find_marker_hmm(cli)?;
-    let hmmout = PathBuf::from(format!("{}.hmmout", filtered_contigs.display()));
-    eprintln!(
-        "Running HMMER hmmsearch (marker HMM: {})...",
-        marker_hmm.display()
-    );
-    crate::external::run_hmmsearch(&faa_path, &marker_hmm, &hmmout, cli.thread, cli.markerset)?;
-
-    // Count HMMER hits for diagnostics
-    let hmm_hit_count = std::fs::read_to_string(&hmmout)
-        .map(|s| s.lines().filter(|l| !l.starts_with('#')).count())
-        .unwrap_or(0);
-    eprintln!("  HMMER produced {} hits", hmm_hit_count);
-
-    // Step 5: Generate seed file from HMM results
-    let seed_file = PathBuf::from(format!("{}.seed", cli.out));
-    eprintln!("Generating seed file from marker genes...");
-    // Matches run_MaxBin.pl lines 482-503: first try normal mode, then max_effort
-    let seed_result = generate_seeds(
-        &hmmout,
-        &filtered_contigs,
-        cli.min_contig_length,
-        &seed_file,
-        false,
-    );
-    if seed_result.is_err() {
-        eprintln!("Try harder to dig out marker genes from contigs.");
-        generate_seeds(
-            &hmmout,
-            &filtered_contigs,
-            cli.min_contig_length,
-            &seed_file,
-            true,
-        )?;
-    }
-
-    // Read seeds
-    let seed_content =
-        std::fs::read_to_string(&seed_file).map_err(|e| format!("Can't read seed file: {e}"))?;
-    let seed_names: Vec<String> = seed_content
-        .lines()
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
-        .collect();
-
-    eprintln!("  {} seed contigs found", seed_names.len());
-    if seed_names.len() <= 1 {
-        return Err("Need at least 2 seed contigs to run EM.".into());
-    }
-    eprintln!("Running EM algorithm...");
-
-    let abund_path_refs: Vec<&Path> = abund_files.iter().map(|p| p.as_path()).collect();
+    // Step 5: Recursive binning
+    // Matches run_MaxBin.pl:467-579: BFS loop that re-seeds and re-bins each
+    // output bin until no more splits are found or recursion depth is reached.
+    //
+    // The loop reuses the SAME HMMER output from step 4. It calls generate_seeds
+    // on each output bin (filtering the HMMER hits to contigs in that bin) to see
+    // if the bin contains multiple organisms, and if so, runs EM again on that bin.
+    const RECURSION_MAX: usize = 5;
+    const MIN_BIN_SIZE: usize = 100_000; // 100 kbp
 
     let params = crate::emanager::EmParams {
         min_seq_length: cli.min_contig_length,
@@ -501,18 +486,254 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         min_prob_threshold: cli.prob_threshold(),
         ..Default::default()
     };
+    let abund_path_refs: Vec<&Path> = abund_files.iter().map(|p| p.as_path()).collect();
 
-    crate::emanager::run_pipeline(
-        &filtered_contigs,
-        &abund_path_refs,
-        &seed_names,
-        &cli.out,
-        &params,
+    // BFS queue: (fasta_path, output_prefix, is_initial)
+    struct BinTask {
+        fasta: PathBuf,
+        out_prefix: String,
+        is_initial: bool,
+    }
+
+    let mut queue: Vec<BinTask> = vec![BinTask {
+        fasta: filtered_contigs.clone(),
+        out_prefix: cli.out.clone(),
+        is_initial: true,
+    }];
+    let mut cursor = 0;
+
+    // Track which queue entries were re-classified (their bins were split further)
+    let mut reclassified: Vec<bool> = vec![false];
+    // Collected output bins: (fasta_path, abundance_value)
+    let mut all_bins: Vec<(PathBuf, f64)> = Vec::new();
+    // Collected noclass files to merge
+    let mut noclass_files: Vec<PathBuf> = Vec::new();
+
+    while cursor < queue.len() {
+        let task = &queue[cursor];
+        let fasta = task.fasta.clone();
+        let out_prefix = task.out_prefix.clone();
+        let is_initial = task.is_initial;
+
+        // Count recursion depth by counting ".out" in the output prefix
+        // Matches run_MaxBin.pl:493: @tmparr = $currbin =~ /[0-9]{4}.out/g;
+        let recursion_depth = out_prefix.matches(".out").count();
+
+        // Generate seeds for this bin from the global HMMER output
+        let seed_file = PathBuf::from(format!("{out_prefix}.seed"));
+        // Only try harder on the initial contigs (matches run_MaxBin.pl:498-505)
+
+        eprintln!(
+            "Generating seeds for {} (depth {recursion_depth})...",
+            fasta.file_name().unwrap_or_default().to_string_lossy()
+        );
+        let seed_result = generate_seeds(&hmmout, &fasta, cli.min_contig_length, &seed_file, false);
+
+        let seeds_found = seed_result.is_ok();
+        if !seeds_found && is_initial {
+            eprintln!("  no seeds (median ≤ 1), retrying with max_effort...");
+            let retry = generate_seeds(&hmmout, &fasta, cli.min_contig_length, &seed_file, true);
+            if retry.is_err() {
+                return Err(
+                    "Marker gene search reveals that the dataset cannot be binned \
+                     (the median of marker gene number <= 1). Program stop."
+                        .into(),
+                );
+            }
+        } else if !seeds_found && !is_initial {
+            // No seeds in this sub-bin — skip it (matches run_MaxBin.pl:510-513)
+            eprintln!("  no seeds (median ≤ 1), skipping sub-bin");
+            cursor += 1;
+            continue;
+        }
+
+        // Check recursion limit (matches run_MaxBin.pl:507-510)
+        if !is_initial && recursion_depth >= RECURSION_MAX {
+            eprintln!("  recursion limit reached, skipping");
+            cursor += 1;
+            continue;
+        }
+
+        // Read seeds
+        let seed_content = std::fs::read_to_string(&seed_file)
+            .map_err(|e| format!("Can't read seed file: {e}"))?;
+        let seed_names: Vec<String> = seed_content
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect();
+
+        eprintln!("  {} seed contigs found", seed_names.len());
+        if seed_names.len() <= 1 {
+            if is_initial {
+                return Err("Need at least 2 seed contigs to run EM.".into());
+            }
+            cursor += 1;
+            continue;
+        }
+
+        // Mark this entry as reclassified (its output bins replace it)
+        reclassified[cursor] = true;
+
+        // Run EM
+        eprintln!("Running EM algorithm (depth {recursion_depth})...");
+        crate::emanager::run_pipeline(&fasta, &abund_path_refs, &seed_names, &out_prefix, &params);
+
+        // Collect noclass file
+        let noclass_path = PathBuf::from(format!("{out_prefix}.noclass"));
+        if noclass_path.exists() {
+            noclass_files.push(noclass_path);
+        }
+
+        // Read summary to find output bins and their abundances,
+        // then push each bin onto the queue for potential re-binning.
+        // Matches run_MaxBin.pl:561-577
+        let summary_path = format!("{out_prefix}.summary");
+        if let Ok(summary) = std::fs::read_to_string(&summary_path) {
+            for line in summary.lines() {
+                // Format: "Bin [path]\tabundance[\tabundance2...]"
+                if let Some(rest) = line.strip_prefix("Bin [")
+                    && let Some(bracket_end) = rest.find(']')
+                {
+                    let bin_path_str = &rest[..bracket_end];
+                    let abund_str = rest[bracket_end + 1..].trim_start_matches('\t');
+                    let abundance: f64 = abund_str
+                        .split('\t')
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0.0);
+
+                    let bin_path = PathBuf::from(bin_path_str);
+                    if bin_path.exists() {
+                        // Queue this bin for potential re-binning
+                        // Output prefix for sub-bins: strip .fasta, add .out
+                        let sub_prefix = bin_path_str
+                            .strip_suffix(".fasta")
+                            .unwrap_or(bin_path_str)
+                            .to_string()
+                            + ".out";
+
+                        queue.push(BinTask {
+                            fasta: bin_path.clone(),
+                            out_prefix: sub_prefix,
+                            is_initial: false,
+                        });
+                        reclassified.push(false);
+                        all_bins.push((bin_path, abundance));
+                    }
+                }
+            }
+        }
+
+        // Clean up intermediate files from this round
+        if !cli.preserve_intermediate {
+            let _ = std::fs::remove_file(&seed_file);
+        }
+        if !is_initial {
+            let _ = std::fs::remove_file(format!("{out_prefix}.summary"));
+            let _ = std::fs::remove_file(format!("{out_prefix}.log"));
+        }
+
+        cursor += 1;
+    }
+
+    eprintln!(
+        "Recursive binning complete: {} total bins before filtering",
+        all_bins.len()
     );
 
-    // Rename bin files from 4-digit to 3-digit padding (matching run_MaxBin.pl getBinNum)
-    // The C++ EManager outputs .0001.fasta, but the Perl renames to .001.fasta
-    let bin_count = rename_bins_to_3digit(&cli.out);
+    // Step 6: Post-processing
+    // Matches run_MaxBin.pl:600-663
+
+    // Remove reclassified bins (they were split into sub-bins)
+    // and bins smaller than MIN_BIN_SIZE
+    let mut final_bins: Vec<(PathBuf, f64)> = Vec::new();
+    let mut small_bin_files: Vec<PathBuf> = Vec::new();
+
+    // Build set of reclassified bin paths
+    let reclassified_paths: std::collections::HashSet<PathBuf> = queue
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| reclassified.get(*i).copied().unwrap_or(false))
+        .filter_map(|(_, task)| {
+            if !task.is_initial {
+                Some(task.fasta.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (path, abundance) in &all_bins {
+        if reclassified_paths.contains(path) {
+            // This bin was re-classified (split further) — delete it
+            let _ = std::fs::remove_file(path);
+            continue;
+        }
+
+        // Check bin size (sum of sequence lengths)
+        let genome_size = get_bin_genome_size(path);
+        if genome_size < MIN_BIN_SIZE {
+            small_bin_files.push(path.clone());
+            continue;
+        }
+
+        final_bins.push((path.clone(), *abundance));
+    }
+
+    // Sort by abundance descending (matches run_MaxBin.pl:637-641)
+    final_bins.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    eprintln!(
+        "  {} bins after filtering ({} removed: {} reclassified, {} < {}bp)",
+        final_bins.len(),
+        all_bins.len() - final_bins.len(),
+        reclassified_paths.len(),
+        small_bin_files.len(),
+        MIN_BIN_SIZE,
+    );
+
+    // Rename bins to final sequential numbering
+    // Matches run_MaxBin.pl:648-663
+    let bin_count = final_bins.len();
+    for (i, (old_path, _)) in final_bins.iter().enumerate() {
+        let bin_num = format!("{:03}", i + 1);
+        let new_path = format!("{}.{bin_num}.fasta", cli.out);
+        // Rename via tmp to avoid collisions
+        let tmp_path = format!("{new_path}.tmp");
+        let _ = std::fs::rename(old_path, &tmp_path);
+        let _ = std::fs::rename(&tmp_path, &new_path);
+    }
+
+    // Merge all noclass files + small bins into final noclass
+    // Matches run_MaxBin.pl:673-710
+    // Write to a .tmp file first since the source noclass files may include
+    // the final output path (the initial EM round writes to {out}.noclass).
+    {
+        let noclass_tmp = format!("{}.tmp.noclass", cli.out);
+        let noclass_final = format!("{}.noclass", cli.out);
+        let mut noclass_out = std::io::BufWriter::new(
+            std::fs::File::create(&noclass_tmp)
+                .map_err(|e| format!("Can't create noclass: {e}"))?,
+        );
+        for nc_file in &noclass_files {
+            if let Ok(content) = std::fs::read(nc_file) {
+                noclass_out.write_all(&content).map_err(|e| e.to_string())?;
+            }
+            if !cli.preserve_intermediate {
+                let _ = std::fs::remove_file(nc_file);
+            }
+        }
+        // Append small bins to noclass
+        for small_bin in &small_bin_files {
+            if let Ok(content) = std::fs::read(small_bin) {
+                noclass_out.write_all(&content).map_err(|e| e.to_string())?;
+            }
+            let _ = std::fs::remove_file(small_bin);
+        }
+        drop(noclass_out); // flush before rename
+        let _ = std::fs::rename(&noclass_tmp, &noclass_final);
+    }
 
     // Step 7: Rewrite summary with completeness, genome size, GC content
     // Matches run_MaxBin.pl:831-884
@@ -527,13 +748,24 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
     if !cli.preserve_intermediate {
         eprintln!("Deleting intermediate files.");
         let _ = std::fs::remove_file(&filtered_contigs);
-        let _ = std::fs::remove_file(&seed_file);
         let _ = std::fs::remove_file(&hmmout);
-        let _ = std::fs::remove_file(&faa_path);
+        if let Some(ref faa) = faa_path {
+            let _ = std::fs::remove_file(faa);
+        }
     }
 
     eprintln!("\n========== Job finished ==========");
     Ok(())
+}
+
+/// Get total genome size (sum of sequence lengths) for a bin FASTA file.
+/// Matches run_MaxBin.pl getBinInfo (genome size component).
+fn get_bin_genome_size(path: &Path) -> usize {
+    let records = match fasta::parse_file(path) {
+        Ok(r) => r,
+        Err(_) => return 0,
+    };
+    records.iter().map(|r| r.len()).sum()
 }
 
 /// Find the marker HMM file. Looks relative to the executable, then falls back
@@ -740,14 +972,27 @@ fn generate_seeds(
     // Matches _getmarker.pl lines 225-233
     let mut best_marker_idx = 0;
     let mut best_query_len = f64::MAX;
-    for (i, (_, info)) in markers.iter().enumerate() {
-        if info.contigs.len() == median_count && info.query_len < best_query_len {
-            best_query_len = info.query_len;
-            best_marker_idx = i;
+    // Log candidates (matches _getmarker.pl debug output)
+    for (i, (name, info)) in markers.iter().enumerate() {
+        if info.contigs.len() == median_count {
+            eprintln!(
+                "  candidate: marker={} query_len={} contigs={}",
+                name,
+                info.query_len,
+                info.contigs.len()
+            );
+            if info.query_len < best_query_len {
+                best_query_len = info.query_len;
+                best_marker_idx = i;
+            }
         }
     }
 
     let seed_contigs = &markers[best_marker_idx].1.contigs;
+    eprintln!(
+        "  selected marker={} query_len={}",
+        markers[best_marker_idx].0, best_query_len
+    );
 
     // Sort seeds to get deterministic order. The original Perl iterates `keys %tmphash`
     // which has implementation-defined ordering. Sorting alphabetically happens to match
@@ -755,6 +1000,10 @@ fn generate_seeds(
     // match Perl's exact hash iteration order (version-dependent).
     let mut sorted_seeds = seed_contigs.clone();
     sorted_seeds.sort();
+
+    for s in &sorted_seeds {
+        eprintln!("  seed: {s}");
+    }
 
     let mut out = std::io::BufWriter::new(
         std::fs::File::create(seed_file).map_err(|e| format!("Can't create seed file: {e}"))?,

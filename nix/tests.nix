@@ -23,6 +23,7 @@
   runCommand,
   binutils-unwrapped,
   maxbin2,
+  maxbin2-f64,
   maxbin-rs,
   maxbin-rs-lto,
   rust,
@@ -175,6 +176,78 @@ in
     dataset = datasets.minigut;
     intermediates' = intermediates.minigut;
   };
+
+  test-cli-equivalence-capes = mkCliEquivTest {
+    name = "capes";
+    dataset = datasets.capes-s7;
+    intermediates' = intermediates.capes;
+  };
+
+  # Recursive binning smoke test — runs both tools on downsampled CAMI (5000
+  # contigs), compares structural properties (bin count, genome size).
+  # Triggers depth-5 recursion in ~7 minutes.
+  test-recursion-smoke =
+    runCommand "test-recursion-smoke"
+      {
+        nativeBuildInputs = [
+          maxbin2
+          maxbin-rs
+        ];
+      }
+      ''
+        export CONTIGS="${intermediates.cami-small}/contigs.fa"
+        export ABUND="${intermediates.cami-small}/abund"
+        export HMMOUT="${intermediates.cami-small}/hmmout"
+        export MAXBIN_RS_DETERMINISTIC=1
+        export HOME=$(mktemp -d)
+
+        bash ${../tests/cli-recursion-smoke.sh}
+
+        touch $out
+      '';
+
+  # Precision divergence test — runs the Rust EM and C++ EM (via FFI)
+  # on a 14-contig sub-bin from CAMI I High where the long double vs f64
+  # precision difference causes different classification. Documents and
+  # asserts the known divergence.
+  #   nix build .#test-precision-divergence
+  test-precision-divergence =
+    runCommand "test-precision-divergence"
+      {
+        nativeBuildInputs = [
+          rust
+          cargo-nextest
+        ];
+      }
+      ''
+        export MAXBIN2_SRC_TARBALL="${maxbin-rs.MAXBIN2_SRC_TARBALL}"
+        cp -r ${../.}/* .
+        chmod -R u+w .
+        cargo nextest run emanager_precision_divergence --no-fail-fast
+        touch $out
+      '';
+
+  # Same smoke test but with the C++ patched to use double instead of
+  # long double — isolates precision as the source of divergence.
+  test-recursion-smoke-f64 =
+    runCommand "test-recursion-smoke-f64"
+      {
+        nativeBuildInputs = [
+          maxbin2-f64
+          maxbin-rs
+        ];
+      }
+      ''
+        export CONTIGS="${intermediates.cami-small}/contigs.fa"
+        export ABUND="${intermediates.cami-small}/abund"
+        export HMMOUT="${intermediates.cami-small}/hmmout"
+        export MAXBIN_RS_DETERMINISTIC=1
+        export HOME=$(mktemp -d)
+
+        bash ${../tests/cli-recursion-smoke.sh}
+
+        touch $out
+      '';
 
   # LTO A/B benchmark: runs the CAMI I High EM three ways (C++ baseline,
   # C++ with -flto, Rust) to test whether link-time optimization explains

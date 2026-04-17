@@ -22,6 +22,7 @@
   fraggenescan,
   makeWrapper,
   src,
+  extraPatches ? [ ],
 }:
 
 stdenv.mkDerivation rec {
@@ -39,7 +40,7 @@ stdenv.mkDerivation rec {
   # 2. Sort all `foreach (keys %hash)` iterations for deterministic output
   #    (Perl 5.18+ randomizes hash key order, causing different seed selection
   #    and bin assignments on every run)
-  patches = [ ./maxbin2-deterministic.patch ];
+  patches = [ ./maxbin2-deterministic.patch ] ++ extraPatches;
 
   buildPhase = ''
     # Only build the C++ core — we provide dependencies via Nix, not buildapp

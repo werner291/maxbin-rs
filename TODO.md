@@ -110,7 +110,31 @@ Critical — these affect bin output and must be fixed before claiming equivalen
   (run_MaxBin.pl:606-626). We keep all bins regardless of size.
 - [ ] **Bin sorting by abundance** — original sorts bins by descending abundance
   and renumbers them (run_MaxBin.pl:628-663). We number sequentially.
+- [x] **Recursive binning** — implemented (depth 5, MIN_BIN_SIZE, abundance sorting)
+- [x] **MIN_BIN_SIZE filtering** — implemented (100kbp threshold)
+- [x] **Bin sorting by abundance** — implemented
 - [x] **hmmsearch flags for markerset=40** — fixed: now uses `-E 1e-3` instead of `--cut_tc`
+- [x] **Seed index ordering** — fixed: iterate FASTA order, not seed file order
+  (matches EManager.cpp:380-412)
+- [ ] **Known precision divergence** — `long double` (80-bit) in C++ vs `f64` (64-bit)
+  in Rust. On a 14-contig sub-bin at recursion depth 4, C++ classifies 0 contigs,
+  Rust classifies 13. Traced and documented with FFI test
+  (`tests/emanager_equivalence.rs::emanager_precision_divergence_cami_depth4`).
+  Affects 9/5000 contigs on downsampled CAMI I High. Cannot fix without 80-bit
+  floats in Rust (not natively supported). The C++ patched to `double` also
+  diverges differently — this is inherent to the algorithm's sensitivity to
+  precision on marginal inputs.
+- [ ] **Summary "Bins without sequences" counter bug** — C++ reuses loop variable `j`
+  in write_result (EManager.cpp:1424-1438), causing wrong numbering when ab_num > 1.
+  Our Rust uses a separate counter and numbers correctly. Not reproduced — unlikely
+  anyone parses this section.
+- [ ] **Summary sprintf rounding** — C++ uses `%0.4Lf` (long double) vs Rust `{:.4}`
+  (f64). Rounding at the 4th decimal boundary could differ due to different input
+  precision. Cosmetic — affects summary file, not bins.
+- [ ] **Seed ordering always deterministic** — seeds are always sorted alphabetically.
+  The `MAXBIN_RS_DETERMINISTIC` env var documented in README is never read; the random
+  shuffle path (matching the original's Perl hash iteration randomness) is not implemented.
+  README claims the env var controls this. Either implement the shuffle or update docs.
 - [ ] **Abundance file header stripping** — original strips leading `>` from abundance
   headers (run_MaxBin.pl:1505-1532 `checkAbundFile`). We don't, so abundance files
   with `>contig_name\tabundance` format will fail to match FASTA headers.

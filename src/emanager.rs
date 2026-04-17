@@ -185,23 +185,22 @@ pub fn init_em(
         seq_profiles.push(prof);
     }
 
-    // Build seed-name -> record-index mapping
-    let header_to_idx: HashMap<&str, usize> = records
-        .iter()
-        .enumerate()
-        .map(|(i, r)| (r.header.as_str(), i))
-        .collect();
+    // Build set of seed names for O(1) lookup
+    let seed_set: std::collections::HashSet<&str> = seed_names.iter().map(|s| s.as_str()).collect();
 
     // Matches EManager.cpp:380-412 (init_EM inner loop for marked seeds):
-    // identify seed contigs, copy their profiles and abundances
+    // identify seed contigs, copy their profiles and abundances.
+    // CRITICAL: iterate in FASTA order, not seed file order. The C++ does
+    // `for (i = 0; i < seqnum; i++) { if (isMark(i)) { seed[j++] = ... } }`
+    // so seed index j corresponds to the j-th marked contig in FASTA order.
     let mut seed_indices = Vec::with_capacity(seed_names.len());
     let mut seed_profiles = Vec::with_capacity(seed_names.len());
     let mut seed_abundance = Vec::with_capacity(seed_names.len());
 
-    for name in seed_names {
-        let &idx = header_to_idx
-            .get(name.as_str())
-            .unwrap_or_else(|| panic!("seed not found in FASTA: {name}"));
+    for (idx, record) in records.iter().enumerate() {
+        if !seed_set.contains(record.header.as_str()) {
+            continue;
+        }
         seed_indices.push(idx);
 
         // Matches EManager.cpp:382-384: seed_profile[j] = new Profiler(...)

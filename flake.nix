@@ -82,6 +82,13 @@
           src = maxbin2-src-tarball;
         };
 
+        # MaxBin2 with long double → double patch for precision testing.
+        maxbin2-f64 = pkgs.callPackage ./nix/maxbin2.nix {
+          inherit fraggenescan;
+          src = maxbin2-src-tarball;
+          extraPatches = [ ./nix/maxbin2-cpp-ffi-f64.patch ];
+        };
+
         # The Rust reimplementation — this is the main output of this project.
         maxbin-rs = pkgs.rustPlatform.buildRustPackage {
           pname = "maxbin-rs";
@@ -167,6 +174,57 @@
             depth = datasets.cami-i-high.depth;
             depthFormat = "metabat"; # NERSC MetaBAT depth format
           };
+          # Downsampled CAMI I High: first 5000 filtered contigs with matching
+          # abundance and HMMER hits. Small enough to run the full recursive
+          # pipeline in ~7 minutes, large enough to trigger depth-5 recursion.
+          cami-small =
+            pkgs.runCommand "cami-small-intermediates"
+              {
+                nativeBuildInputs = [
+                  maxbin-rs
+                  pkgs.gawk
+                ];
+              }
+              ''
+                # Filter full CAMI contigs
+                maxbin-rs filter -contig ${datasets.cami-i-high.contigs} -out $TMPDIR/full 2>/dev/null
+
+                # Take first 5000 filtered contigs
+                awk '/^>/{n++} n>5000{exit} {print}' $TMPDIR/full.contig.tmp > $TMPDIR/small.fa
+
+                # Extract contig names
+                grep '^>' $TMPDIR/small.fa | sed 's/^>//;s/ .*//' > $TMPDIR/names.txt
+
+                # Subset abundance (exact match on first column)
+                awk -F'\t' 'NR==FNR{names[$1]; next} $1 in names' \
+                  $TMPDIR/names.txt ${intermediates.cami}/abund > $TMPDIR/abund.txt
+
+                # Subset HMMER hits (match contig name from gene ID)
+                grep '^#' ${intermediates.cami}/hmmout > $TMPDIR/hmmout
+                awk 'NR==FNR{names[$1]; next} /^#/{next} {
+                  n=split($1,a,"_"); contig="";
+                  for(i=1;i<=n-3;i++){if(i>1)contig=contig"_"; contig=contig a[i]}
+                  if(contig in names) print
+                }' $TMPDIR/names.txt ${intermediates.cami}/hmmout >> $TMPDIR/hmmout
+
+                mkdir -p $out
+                cp $TMPDIR/small.fa $out/contigs.fa
+                cp $TMPDIR/abund.txt $out/abund
+                cp $TMPDIR/hmmout $out/hmmout
+                cp $TMPDIR/full.tooshort $out/tooshort
+
+                # Generate seeds from subsetted HMMER output
+                MAXBIN_RS_DETERMINISTIC=1 maxbin-rs seeds \
+                  -contig $out/contigs.fa -hmmout $out/hmmout -out $TMPDIR/seeds 2>/dev/null
+                cp $TMPDIR/seeds.seed $out/seed
+
+                echo "=== cami-small summary ==="
+                echo "  contigs: $(grep -c '^>' $out/contigs.fa)"
+                echo "  abundance lines: $(wc -l < $out/abund)"
+                echo "  HMMER hits: $(grep -cv '^#' $out/hmmout)"
+                echo "  seeds: $(wc -l < $out/seed)"
+              '';
+
           metahit = intermediatesLib.mkPipelineIntermediatesFromAbund {
             name = "metahit";
             contigs = datasets.metahit.contigs;
@@ -183,6 +241,7 @@
           inherit (pkgs) writeShellApplication runCommand binutils-unwrapped;
           inherit
             maxbin2
+            maxbin2-f64
             maxbin-rs
             maxbin-rs-lto
             rust
@@ -239,6 +298,7 @@
             cami
             metahit
             ;
+          "cami-small" = intermediates.cami-small;
           inherit (tests)
             test-pipeline-stages
             test-pipeline-stages-minigut
@@ -249,6 +309,10 @@
             test-cli-minigut
             test-cli-equivalence
             test-cli-equivalence-minigut
+            test-cli-equivalence-capes
+            test-recursion-smoke
+            test-recursion-smoke-f64
+            test-precision-divergence
             bench-components
             bench-cpp-lto
             disasm-em
