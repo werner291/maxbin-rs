@@ -2,7 +2,6 @@
 ///
 /// Computes tetranucleotide frequency profiles for DNA sequences.
 /// Normalizes counts by dividing by total valid k-mers found.
-
 use crate::kmer_map::KmerMap;
 
 pub struct Profiler {

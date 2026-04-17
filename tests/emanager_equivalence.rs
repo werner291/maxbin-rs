@@ -7,7 +7,6 @@
 ///
 /// For equivalence testing on real metagenomics data, see the pipeline
 /// stage tests: tests/pipeline-stages.sh (run via nix run .#test-pipeline-stages).
-
 use std::io::Write;
 use std::path::Path;
 
@@ -62,9 +61,8 @@ fn emanager_cpp_vs_rust() {
     // Run C++ EManager via FFI.
     let cpp_prefix = test_dir.join("cpp").to_str().unwrap().to_string();
     {
-        let em = maxbin_rs::original_ffi::OriginalEManager::new(
-            &fasta_path, &abund_path, &cpp_prefix,
-        );
+        let em =
+            maxbin_rs::original_ffi::OriginalEManager::new(&fasta_path, &abund_path, &cpp_prefix);
         em.set_thread_num(1);
         assert_eq!(em.run(&seed_path), 0, "C++ EManager returned error");
     }
@@ -74,9 +72,7 @@ fn emanager_cpp_vs_rust() {
     {
         let params = maxbin_rs::emanager::EmParams::default();
         let abund_ref: &Path = &abund_path;
-        maxbin_rs::emanager::run_pipeline(
-            &fasta_path, &[abund_ref], &seeds, &rust_prefix, &params,
-        );
+        maxbin_rs::emanager::run_pipeline(&fasta_path, &[abund_ref], &seeds, &rust_prefix, &params);
     }
 
     // Compare output files byte-for-byte.
@@ -86,9 +82,12 @@ fn emanager_cpp_vs_rust() {
         let rust_bytes = std::fs::read(&rust_file).unwrap_or_default();
         let cpp_bytes = std::fs::read(&cpp_file).unwrap_or_default();
         assert_eq!(
-            rust_bytes, cpp_bytes,
+            rust_bytes,
+            cpp_bytes,
             "{} differs (rust {} bytes, cpp {} bytes)",
-            suffix, rust_bytes.len(), cpp_bytes.len()
+            suffix,
+            rust_bytes.len(),
+            cpp_bytes.len()
         );
     }
 
@@ -97,7 +96,10 @@ fn emanager_cpp_vs_rust() {
     let cpp_summary = std::fs::read_to_string(format!("{}.summary", cpp_prefix)).unwrap();
     let rust_normalized = rust_summary.replace(&rust_prefix, "PREFIX");
     let cpp_normalized = cpp_summary.replace(&cpp_prefix, "PREFIX");
-    assert_eq!(rust_normalized, cpp_normalized, "summary differs after normalizing paths");
+    assert_eq!(
+        rust_normalized, cpp_normalized,
+        "summary differs after normalizing paths"
+    );
 
     let _ = std::fs::remove_dir_all(&test_dir);
 }

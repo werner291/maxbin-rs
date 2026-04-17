@@ -2,7 +2,6 @@
 ///
 /// - sort_descending(): covered by quicksort_equivalence (proptest, 500 cases + duplicates)
 ///   Inline FFI test: quicksort.rs::tests::equivalence_with_original (hardcoded)
-
 use proptest::prelude::*;
 
 proptest! {

@@ -17,7 +17,6 @@
 /// single-dash flag syntax and dispatched to `pipeline` for backwards compatibility.
 ///
 /// Matches run_MaxBin.pl:140-290 (argument parsing loop).
-
 use std::path::PathBuf;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -197,8 +196,14 @@ Usage:
 
 /// Known subcommand names (used to distinguish subcommands from legacy flags).
 const SUBCOMMANDS: &[&str] = &[
-    "filter", "seeds", "em", "cpp-em", "cpp_em",
-    "sam-to-abund", "sam_to_abund", "pipeline",
+    "filter",
+    "seeds",
+    "em",
+    "cpp-em",
+    "cpp_em",
+    "sam-to-abund",
+    "sam_to_abund",
+    "pipeline",
 ];
 
 /// Parse CLI arguments, detecting subcommands or falling back to legacy mode.
@@ -246,7 +251,10 @@ fn normalize_subcmd(arg: &str) -> Option<String> {
         return None;
     }
     let normalized = arg.replace('_', "-");
-    if SUBCOMMANDS.iter().any(|&s| s.replace('_', "-") == normalized) {
+    if SUBCOMMANDS
+        .iter()
+        .any(|&s| s.replace('_', "-") == normalized)
+    {
         Some(normalized)
     } else {
         None
@@ -262,10 +270,22 @@ fn parse_filter_args(args: &[String]) -> FilterArgs {
     while i < args.len() {
         let arg = normalize_flag(&args[i]);
         match arg.as_str() {
-            "-contig" => { i += 1; contig = PathBuf::from(&args[i]); }
-            "-out" => { i += 1; out = args[i].clone(); }
-            "-min_contig_length" => { i += 1; min_contig_length = args[i].parse().unwrap_or(1000); }
-            "-version" | "-v" => { eprintln!("MaxBin {VERSION}"); std::process::exit(0); }
+            "-contig" => {
+                i += 1;
+                contig = PathBuf::from(&args[i]);
+            }
+            "-out" => {
+                i += 1;
+                out = args[i].clone();
+            }
+            "-min_contig_length" => {
+                i += 1;
+                min_contig_length = args[i].parse().unwrap_or(1000);
+            }
+            "-version" | "-v" => {
+                eprintln!("MaxBin {VERSION}");
+                std::process::exit(0);
+            }
             _ => {
                 eprintln!("Unrecognized token [{}]", args[i]);
                 eprintln!("{FILTER_USAGE}");
@@ -280,7 +300,11 @@ fn parse_filter_args(args: &[String]) -> FilterArgs {
         std::process::exit(1);
     }
 
-    FilterArgs { contig, out, min_contig_length }
+    FilterArgs {
+        contig,
+        out,
+        min_contig_length,
+    }
 }
 
 fn parse_seeds_args(args: &[String]) -> SeedsArgs {
@@ -294,12 +318,30 @@ fn parse_seeds_args(args: &[String]) -> SeedsArgs {
     while i < args.len() {
         let arg = normalize_flag(&args[i]);
         match arg.as_str() {
-            "-contig" => { i += 1; contig = PathBuf::from(&args[i]); }
-            "-hmmout" => { i += 1; hmmout = PathBuf::from(&args[i]); }
-            "-out" => { i += 1; out = args[i].clone(); }
-            "-min_contig_length" => { i += 1; min_contig_length = args[i].parse().unwrap_or(1000); }
-            "-markerset" => { i += 1; markerset = args[i].parse().unwrap_or(107); }
-            "-version" | "-v" => { eprintln!("MaxBin {VERSION}"); std::process::exit(0); }
+            "-contig" => {
+                i += 1;
+                contig = PathBuf::from(&args[i]);
+            }
+            "-hmmout" => {
+                i += 1;
+                hmmout = PathBuf::from(&args[i]);
+            }
+            "-out" => {
+                i += 1;
+                out = args[i].clone();
+            }
+            "-min_contig_length" => {
+                i += 1;
+                min_contig_length = args[i].parse().unwrap_or(1000);
+            }
+            "-markerset" => {
+                i += 1;
+                markerset = args[i].parse().unwrap_or(107);
+            }
+            "-version" | "-v" => {
+                eprintln!("MaxBin {VERSION}");
+                std::process::exit(0);
+            }
             _ => {
                 eprintln!("Unrecognized token [{}]", args[i]);
                 eprintln!("{SEEDS_USAGE}");
@@ -314,7 +356,13 @@ fn parse_seeds_args(args: &[String]) -> SeedsArgs {
         std::process::exit(1);
     }
 
-    SeedsArgs { contig, hmmout, out, min_contig_length, markerset }
+    SeedsArgs {
+        contig,
+        hmmout,
+        out,
+        min_contig_length,
+        markerset,
+    }
 }
 
 fn parse_em_args(args: &[String]) -> EmArgs {
@@ -332,19 +380,45 @@ fn parse_em_args(args: &[String]) -> EmArgs {
     while i < args.len() {
         let arg = normalize_flag(&args[i]);
         match arg.as_str() {
-            "-contig" => { i += 1; contig = PathBuf::from(&args[i]); }
-            "-seed" => { i += 1; seed = PathBuf::from(&args[i]); }
-            "-out" => { i += 1; out = args[i].clone(); }
-            "-thread" => { i += 1; thread = args[i].parse().unwrap_or(1); }
-            "-max_iteration" => { i += 1; max_iteration = args[i].parse().unwrap_or(50); }
-            "-min_contig_length" => { i += 1; min_contig_length = args[i].parse().unwrap_or(1000); }
-            "-abund_list" => { i += 1; abund_list = Some(PathBuf::from(&args[i])); }
+            "-contig" => {
+                i += 1;
+                contig = PathBuf::from(&args[i]);
+            }
+            "-seed" => {
+                i += 1;
+                seed = PathBuf::from(&args[i]);
+            }
+            "-out" => {
+                i += 1;
+                out = args[i].clone();
+            }
+            "-thread" => {
+                i += 1;
+                thread = args[i].parse().unwrap_or(1);
+            }
+            "-max_iteration" => {
+                i += 1;
+                max_iteration = args[i].parse().unwrap_or(50);
+            }
+            "-min_contig_length" => {
+                i += 1;
+                min_contig_length = args[i].parse().unwrap_or(1000);
+            }
+            "-abund_list" => {
+                i += 1;
+                abund_list = Some(PathBuf::from(&args[i]));
+            }
             "-prob_threshold" => {
                 i += 1;
                 let v: f64 = args[i].parse().unwrap_or(-1.0);
-                if v >= 0.0 { prob_threshold = v; }
+                if v >= 0.0 {
+                    prob_threshold = v;
+                }
             }
-            "-version" | "-v" => { eprintln!("MaxBin {VERSION}"); std::process::exit(0); }
+            "-version" | "-v" => {
+                eprintln!("MaxBin {VERSION}");
+                std::process::exit(0);
+            }
             // Matches run_MaxBin.pl:178 — regex /^\-abund/ catches -abund, -abund2, etc.
             s if s.starts_with("-abund") => {
                 i += 1;
@@ -369,7 +443,17 @@ fn parse_em_args(args: &[String]) -> EmArgs {
         std::process::exit(1);
     }
 
-    EmArgs { contig, abund, abund_list, seed, out, thread, max_iteration, prob_threshold, min_contig_length }
+    EmArgs {
+        contig,
+        abund,
+        abund_list,
+        seed,
+        out,
+        thread,
+        max_iteration,
+        prob_threshold,
+        min_contig_length,
+    }
 }
 
 fn parse_cpp_em_args(args: &[String]) -> CppEmArgs {
@@ -383,12 +467,30 @@ fn parse_cpp_em_args(args: &[String]) -> CppEmArgs {
     while i < args.len() {
         let arg = normalize_flag(&args[i]);
         match arg.as_str() {
-            "-contig" => { i += 1; contig = PathBuf::from(&args[i]); }
-            "-abund" => { i += 1; abund = PathBuf::from(&args[i]); }
-            "-seed" => { i += 1; seed = PathBuf::from(&args[i]); }
-            "-out" => { i += 1; out = args[i].clone(); }
-            "-thread" => { i += 1; thread = args[i].parse().unwrap_or(1); }
-            "-version" | "-v" => { eprintln!("MaxBin {VERSION}"); std::process::exit(0); }
+            "-contig" => {
+                i += 1;
+                contig = PathBuf::from(&args[i]);
+            }
+            "-abund" => {
+                i += 1;
+                abund = PathBuf::from(&args[i]);
+            }
+            "-seed" => {
+                i += 1;
+                seed = PathBuf::from(&args[i]);
+            }
+            "-out" => {
+                i += 1;
+                out = args[i].clone();
+            }
+            "-thread" => {
+                i += 1;
+                thread = args[i].parse().unwrap_or(1);
+            }
+            "-version" | "-v" => {
+                eprintln!("MaxBin {VERSION}");
+                std::process::exit(0);
+            }
             _ => {
                 eprintln!("Unrecognized token [{}]", args[i]);
                 eprintln!("{CPP_EM_USAGE}");
@@ -398,12 +500,22 @@ fn parse_cpp_em_args(args: &[String]) -> CppEmArgs {
         i += 1;
     }
 
-    if contig.as_os_str().is_empty() || abund.as_os_str().is_empty() || seed.as_os_str().is_empty() || out.is_empty() {
+    if contig.as_os_str().is_empty()
+        || abund.as_os_str().is_empty()
+        || seed.as_os_str().is_empty()
+        || out.is_empty()
+    {
         eprintln!("{CPP_EM_USAGE}");
         std::process::exit(1);
     }
 
-    CppEmArgs { contig, abund, seed, out, thread }
+    CppEmArgs {
+        contig,
+        abund,
+        seed,
+        out,
+        thread,
+    }
 }
 
 fn parse_sam_to_abund_args(args: &[String]) -> SamToAbundArgs {
@@ -414,9 +526,18 @@ fn parse_sam_to_abund_args(args: &[String]) -> SamToAbundArgs {
     while i < args.len() {
         let arg = normalize_flag(&args[i]);
         match arg.as_str() {
-            "-sam" => { i += 1; sam = PathBuf::from(&args[i]); }
-            "-out" => { i += 1; out = PathBuf::from(&args[i]); }
-            "-version" | "-v" => { eprintln!("MaxBin {VERSION}"); std::process::exit(0); }
+            "-sam" => {
+                i += 1;
+                sam = PathBuf::from(&args[i]);
+            }
+            "-out" => {
+                i += 1;
+                out = PathBuf::from(&args[i]);
+            }
+            "-version" | "-v" => {
+                eprintln!("MaxBin {VERSION}");
+                std::process::exit(0);
+            }
             _ => {
                 eprintln!("Unrecognized token [{}]", args[i]);
                 eprintln!("{SAM_TO_ABUND_USAGE}");
@@ -646,9 +767,20 @@ mod tests {
     #[test]
     fn parse_original_syntax() {
         let args: Vec<String> = vec![
-            "-contig", "contigs.fa", "-reads", "r1.fq", "-reads2", "r2.fq",
-            "-out", "output", "-thread", "4",
-        ].into_iter().map(String::from).collect();
+            "-contig",
+            "contigs.fa",
+            "-reads",
+            "r1.fq",
+            "-reads2",
+            "r2.fq",
+            "-out",
+            "output",
+            "-thread",
+            "4",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -665,9 +797,18 @@ mod tests {
     #[test]
     fn parse_double_dash_syntax() {
         let args: Vec<String> = vec![
-            "--contig", "contigs.fa", "--reads", "r1.fq",
-            "--out", "output", "--thread", "4",
-        ].into_iter().map(String::from).collect();
+            "--contig",
+            "contigs.fa",
+            "--reads",
+            "r1.fq",
+            "--out",
+            "output",
+            "--thread",
+            "4",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -684,9 +825,12 @@ mod tests {
     #[test]
     fn parse_abund_numbered() {
         let args: Vec<String> = vec![
-            "-contig", "c.fa", "-abund", "a1.txt", "-abund2", "a2.txt",
-            "-abund3", "a3.txt", "-out", "o",
-        ].into_iter().map(String::from).collect();
+            "-contig", "c.fa", "-abund", "a1.txt", "-abund2", "a2.txt", "-abund3", "a3.txt",
+            "-out", "o",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -703,14 +847,18 @@ mod tests {
         assert_eq!(normalize_flag("--contig"), "-contig");
         assert_eq!(normalize_flag("--min-contig-length"), "-min_contig_length");
         assert_eq!(normalize_flag("-min_contig_length"), "-min_contig_length");
-        assert_eq!(normalize_flag("--preserve-intermediate"), "-preserve_intermediate");
+        assert_eq!(
+            normalize_flag("--preserve-intermediate"),
+            "-preserve_intermediate"
+        );
     }
 
     #[test]
     fn default_prob_threshold() {
-        let args: Vec<String> = vec![
-            "-contig", "c.fa", "-reads", "r.fq", "-out", "o",
-        ].into_iter().map(String::from).collect();
+        let args: Vec<String> = vec!["-contig", "c.fa", "-reads", "r.fq", "-out", "o"]
+            .into_iter()
+            .map(String::from)
+            .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -725,9 +873,17 @@ mod tests {
     #[test]
     fn parse_filter_subcommand() {
         let args: Vec<String> = vec![
-            "filter", "-contig", "input.fa.gz", "-out", "prefix",
-            "-min_contig_length", "500",
-        ].into_iter().map(String::from).collect();
+            "filter",
+            "-contig",
+            "input.fa.gz",
+            "-out",
+            "prefix",
+            "-min_contig_length",
+            "500",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -743,8 +899,17 @@ mod tests {
     #[test]
     fn parse_seeds_subcommand() {
         let args: Vec<String> = vec![
-            "seeds", "-contig", "filtered.fa", "-hmmout", "hits.txt", "-out", "prefix",
-        ].into_iter().map(String::from).collect();
+            "seeds",
+            "-contig",
+            "filtered.fa",
+            "-hmmout",
+            "hits.txt",
+            "-out",
+            "prefix",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -760,9 +925,21 @@ mod tests {
     #[test]
     fn parse_em_subcommand() {
         let args: Vec<String> = vec![
-            "em", "-contig", "filtered.fa", "-abund", "depth.txt",
-            "-seed", "seeds.txt", "-out", "prefix", "-thread", "4",
-        ].into_iter().map(String::from).collect();
+            "em",
+            "-contig",
+            "filtered.fa",
+            "-abund",
+            "depth.txt",
+            "-seed",
+            "seeds.txt",
+            "-out",
+            "prefix",
+            "-thread",
+            "4",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -780,9 +957,11 @@ mod tests {
     #[test]
     fn parse_cpp_em_subcommand() {
         let args: Vec<String> = vec![
-            "cpp-em", "-contig", "f.fa", "-abund", "d.txt",
-            "-seed", "s.txt", "-out", "o",
-        ].into_iter().map(String::from).collect();
+            "cpp-em", "-contig", "f.fa", "-abund", "d.txt", "-seed", "s.txt", "-out", "o",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -798,9 +977,10 @@ mod tests {
 
     #[test]
     fn parse_sam_to_abund_subcommand() {
-        let args: Vec<String> = vec![
-            "sam-to-abund", "-sam", "input.sam", "-out", "output.txt",
-        ].into_iter().map(String::from).collect();
+        let args: Vec<String> = vec!["sam-to-abund", "-sam", "input.sam", "-out", "output.txt"]
+            .into_iter()
+            .map(String::from)
+            .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -814,9 +994,10 @@ mod tests {
 
     #[test]
     fn parse_explicit_pipeline_subcommand() {
-        let args: Vec<String> = vec![
-            "pipeline", "-contig", "c.fa", "-reads", "r.fq", "-out", "o",
-        ].into_iter().map(String::from).collect();
+        let args: Vec<String> = vec!["pipeline", "-contig", "c.fa", "-reads", "r.fq", "-out", "o"]
+            .into_iter()
+            .map(String::from)
+            .collect();
 
         let cmd = parse_from(&args);
         match cmd {
@@ -832,9 +1013,10 @@ mod tests {
     #[test]
     fn legacy_flags_become_pipeline() {
         // Flags without a subcommand should parse as Pipeline
-        let args: Vec<String> = vec![
-            "-contig", "c.fa", "-abund", "a.txt", "-out", "o",
-        ].into_iter().map(String::from).collect();
+        let args: Vec<String> = vec!["-contig", "c.fa", "-abund", "a.txt", "-out", "o"]
+            .into_iter()
+            .map(String::from)
+            .collect();
 
         let cmd = parse_from(&args);
         assert!(matches!(cmd, Command::Pipeline(_)));
@@ -844,7 +1026,10 @@ mod tests {
     fn em_default_prob_threshold() {
         let args: Vec<String> = vec![
             "em", "-contig", "c.fa", "-abund", "a.txt", "-seed", "s.txt", "-out", "o",
-        ].into_iter().map(String::from).collect();
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let cmd = parse_from(&args);
         match cmd {

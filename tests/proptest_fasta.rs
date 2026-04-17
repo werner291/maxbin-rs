@@ -5,7 +5,6 @@
 ///   Generators exercise: headers with descriptions (whitespace truncation),
 ///   empty sequences, N/IUPAC characters, lowercase, \r\n line endings,
 ///   junk lines before first header.
-
 use proptest::prelude::*;
 use std::io::{Cursor, Write};
 

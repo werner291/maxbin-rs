@@ -11,7 +11,6 @@
 ///
 /// - init_em() / run_em() / classify() / write_results() / run_pipeline(): covered by
 ///   tests/emanager_equivalence.rs (integration tests, including synthetic full-pipeline test)
-
 use proptest::prelude::*;
 
 /// Compute prob_dist via C++ FFI NormalDistribution for cross-checking.

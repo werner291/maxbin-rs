@@ -53,7 +53,13 @@ fn sort_recursive(arr: &mut [f64], mut indices: Option<&mut [i32]>, low: i32, hi
         }
 
         // Matches quickSort.cpp:108-109: recurse on left and right partitions
-        sort_recursive(arr, indices.as_deref_mut().map(|s| &mut *s), low, j - 1, num);
+        sort_recursive(
+            arr,
+            indices.as_deref_mut().map(|s| &mut *s),
+            low,
+            j - 1,
+            num,
+        );
         sort_recursive(arr, indices, j + 1, high, num);
     }
 }

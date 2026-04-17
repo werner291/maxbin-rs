@@ -9,7 +9,6 @@
 /// both sides run at -O0, which is fair but not representative of real performance.)
 ///
 /// Requires MAXBIN2_TEST_CONTIGS env var for FASTA/profiler/distance benchmarks.
-
 use std::io::Cursor;
 use std::time::{Duration, Instant};
 
@@ -244,7 +243,10 @@ fn bench_abundance_parse(path: &std::path::Path, raw_bytes: &[u8]) -> (f64, f64)
 #[ignore] // Run explicitly: cargo nextest run bench_components -- --ignored
 fn bench_components() {
     eprintln!();
-    eprintln!("=== Component Performance: Rust vs C++ ({:.0}s per component) ===", BENCH_DURATION.as_secs_f64());
+    eprintln!(
+        "=== Component Performance: Rust vs C++ ({:.0}s per component) ===",
+        BENCH_DURATION.as_secs_f64()
+    );
 
     print_header();
 
@@ -297,7 +299,13 @@ fn bench_components() {
     let abund_content: String = records
         .iter()
         .enumerate()
-        .map(|(i, rec)| format!("{}\t{:.6}\n", rec.header, 1.0 + (i as f64 * 0.37).sin().abs() * 10.0))
+        .map(|(i, rec)| {
+            format!(
+                "{}\t{:.6}\n",
+                rec.header,
+                1.0 + (i as f64 * 0.37).sin().abs() * 10.0
+            )
+        })
         .collect();
     let abund_path = std::env::temp_dir().join("maxbin_rs_bench_abund.txt");
     std::fs::write(&abund_path, &abund_content).unwrap();

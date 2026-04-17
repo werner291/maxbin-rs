@@ -1,6 +1,5 @@
 /// FFI bindings to the original MaxBin2 C++ code.
 /// Used only for equivalence testing — not compiled into release builds.
-
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
@@ -268,11 +267,7 @@ unsafe extern "C" {
         seq1: *const c_char,
         seq2: *const c_char,
     ) -> f64;
-    fn eucdist_get_dist_profile(
-        ptr: *mut std::ffi::c_void,
-        pro1: *mut f64,
-        pro2: *mut f64,
-    ) -> f64;
+    fn eucdist_get_dist_profile(ptr: *mut std::ffi::c_void, pro1: *mut f64, pro2: *mut f64) -> f64;
 }
 
 pub struct OriginalEucDist {
@@ -381,8 +376,7 @@ impl OriginalEManager {
         let c_fasta = CString::new(fasta_path.to_str().unwrap()).unwrap();
         let c_abund = CString::new(abund_path.to_str().unwrap()).unwrap();
         let c_output = CString::new(output_prefix).unwrap();
-        let ptr =
-            unsafe { emanager_new(c_fasta.as_ptr(), c_abund.as_ptr(), c_output.as_ptr()) };
+        let ptr = unsafe { emanager_new(c_fasta.as_ptr(), c_abund.as_ptr(), c_output.as_ptr()) };
         Self { ptr }
     }
 

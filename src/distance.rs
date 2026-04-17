@@ -2,7 +2,6 @@
 ///
 /// Both depend on KmerMap, Profiler, and quickSort.
 /// Only EucDist and SpearmanDist are used by EManager.
-
 use crate::kmer_map::KmerMap;
 use crate::profiler::Profiler;
 use crate::quicksort;
@@ -150,7 +149,10 @@ mod tests {
         let ctx = DistanceContext::new(4);
         let seq = b"ACGTACGTACGTACGT";
         let d = euc_dist_seq(&ctx, seq, seq);
-        assert!(d.abs() < 1e-12, "identical sequences should have distance 0, got {d}");
+        assert!(
+            d.abs() < 1e-12,
+            "identical sequences should have distance 0, got {d}"
+        );
     }
 
     #[test]
@@ -165,7 +167,10 @@ mod tests {
         let ctx = DistanceContext::new(4);
         let seq = b"ACGTACGTACGTACGT";
         let d = spearman_dist_seq(&ctx, seq, seq);
-        assert!(d.abs() < 1e-12, "identical sequences should have distance 0, got {d}");
+        assert!(
+            d.abs() < 1e-12,
+            "identical sequences should have distance 0, got {d}"
+        );
     }
 
     #[test]
@@ -220,16 +225,16 @@ mod tests {
         // Build profiles from known sequences, then compare profile-based distance
         let cpp = crate::original_ffi::OriginalEucDist::new(4);
 
-        let seqs = [
-            "ACGTACGTACGTACGT",
-            "AAAAAAAAAAAAAAAA",
-            "ATCGATCGATCGATCG",
-        ];
+        let seqs = ["ACGTACGTACGTACGT", "AAAAAAAAAAAAAAAA", "ATCGATCGATCGATCG"];
 
         let rust_kmap = KmerMap::new(4, true);
         let profiles: Vec<Vec<f64>> = seqs
             .iter()
-            .map(|s| Profiler::new(4, s.as_bytes(), &rust_kmap).get_profile().to_vec())
+            .map(|s| {
+                Profiler::new(4, s.as_bytes(), &rust_kmap)
+                    .get_profile()
+                    .to_vec()
+            })
             .collect();
 
         for i in 0..profiles.len() {
@@ -277,15 +282,15 @@ mod tests {
         let cpp = crate::original_ffi::OriginalSpearmanDist::new(4);
 
         let rust_kmap = KmerMap::new(4, true);
-        let seqs = [
-            "ACGTACGTACGTACGT",
-            "AAAAAAAAAAAAAAAA",
-            "ATCGATCGATCGATCG",
-        ];
+        let seqs = ["ACGTACGTACGTACGT", "AAAAAAAAAAAAAAAA", "ATCGATCGATCGATCG"];
 
         let profiles: Vec<Vec<f64>> = seqs
             .iter()
-            .map(|s| Profiler::new(4, s.as_bytes(), &rust_kmap).get_profile().to_vec())
+            .map(|s| {
+                Profiler::new(4, s.as_bytes(), &rust_kmap)
+                    .get_profile()
+                    .to_vec()
+            })
             .collect();
 
         for i in 0..profiles.len() {

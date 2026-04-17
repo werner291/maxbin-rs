@@ -145,7 +145,11 @@ fn main() {
     let unity = env::var("MAXBIN2_CPP_LTO").as_deref() == Ok("1");
 
     let mut build = cc::Build::new();
-    build.cpp(true).std("c++11").warnings(false).include(&cpp_dir);
+    build
+        .cpp(true)
+        .std("c++11")
+        .warnings(false)
+        .include(&cpp_dir);
 
     if unity {
         eprintln!("build.rs: unity build enabled (all C++ in one translation unit)");

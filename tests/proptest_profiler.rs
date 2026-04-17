@@ -101,8 +101,11 @@ mod profiler_weighted_avg_proptest {
     use proptest::prelude::*;
 
     fn arb_dna_seq() -> impl Strategy<Value = String> {
-        prop::collection::vec(prop_oneof![Just('A'), Just('C'), Just('G'), Just('T')], 50..300)
-            .prop_map(|chars| chars.into_iter().collect::<String>())
+        prop::collection::vec(
+            prop_oneof![Just('A'), Just('C'), Just('G'), Just('T')],
+            50..300,
+        )
+        .prop_map(|chars| chars.into_iter().collect::<String>())
     }
 
     proptest! {

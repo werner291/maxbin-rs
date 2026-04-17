@@ -60,13 +60,10 @@ pub fn parse<R: std::io::BufRead>(reader: R) -> Result<Vec<AbundanceRecord>, Str
         // atof skips leading whitespace before parsing the number, while Rust's
         // f64::parse does not. We trim to match atof behavior — this matters when
         // the && bug leaves a second separator character in value_part (e.g. "\t308.5").
-        let abundance: f64 = value_part
-            .trim_start()
-            .parse()
-            .unwrap_or_else(|_| {
-                // atof in C returns 0.0 for unparseable strings
-                0.0
-            });
+        let abundance: f64 = value_part.trim_start().parse().unwrap_or_else(|_| {
+            // atof in C returns 0.0 for unparseable strings
+            0.0
+        });
 
         // Matches AbundanceLoader.cpp:173-176: clamp to VERY_SMALL_NUM
         let abundance = if abundance < VERY_SMALL_NUM {
@@ -83,7 +80,8 @@ pub fn parse<R: std::io::BufRead>(reader: R) -> Result<Vec<AbundanceRecord>, Str
 
 /// Parse an abundance file from a path.
 pub fn parse_file(path: &std::path::Path) -> Result<Vec<AbundanceRecord>, String> {
-    let file = std::fs::File::open(path).map_err(|e| format!("can't open {}: {e}", path.display()))?;
+    let file =
+        std::fs::File::open(path).map_err(|e| format!("can't open {}: {e}", path.display()))?;
     let reader = std::io::BufReader::new(file);
     parse(reader)
 }

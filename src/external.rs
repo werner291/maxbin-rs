@@ -17,7 +17,6 @@
 /// - The original resolves tool paths via a hand-written `setting` file with
 ///   manual absolute paths — a constant source of user pain (Biostars #9473674).
 ///   We find tools on $PATH instead.
-
 use std::path::Path;
 use std::process::Command;
 
@@ -31,11 +30,7 @@ use std::process::Command;
 /// KNOWN ISSUE: FragGeneScan is optimized for short reads but MaxBin2 feeds it
 /// assembled contigs. This is a misuse inherited from the original. Use
 /// `run_prodigal` for better results on contigs.
-pub fn run_fraggenescan(
-    contig: &Path,
-    out_prefix: &str,
-    threads: usize,
-) -> Result<(), String> {
+pub fn run_fraggenescan(contig: &Path, out_prefix: &str, threads: usize) -> Result<(), String> {
     let status = Command::new("run_FragGeneScan.pl")
         .arg(format!("-genome={}", contig.display()))
         .arg(format!("-out={out_prefix}.frag"))
@@ -61,10 +56,7 @@ pub fn run_fraggenescan(
 ///
 /// NOTE: No direct Perl equivalent — the original only supports FragGeneScan.
 /// Prodigal support is inspired by mruehlemann/maxbin2_custom fork.
-pub fn run_prodigal(
-    contig: &Path,
-    out_prefix: &str,
-) -> Result<(), String> {
+pub fn run_prodigal(contig: &Path, out_prefix: &str) -> Result<(), String> {
     let faa = format!("{out_prefix}.faa");
     let status = Command::new("prodigal")
         .args(["-a", &faa])
@@ -117,10 +109,7 @@ pub fn run_hmmsearch(
 
 /// Build a Bowtie2 index from a contig file.
 /// Matches run_MaxBin.pl:~385-395: `bowtie2-build $contig $out_f.idx`
-pub fn bowtie2_build(
-    contig: &Path,
-    index_prefix: &str,
-) -> Result<(), String> {
+pub fn bowtie2_build(contig: &Path, index_prefix: &str) -> Result<(), String> {
     let status = Command::new("bowtie2-build")
         .arg(contig)
         .arg(index_prefix)
@@ -148,10 +137,14 @@ pub fn bowtie2_map(
     is_fasta: bool,
 ) -> Result<(), String> {
     let mut cmd = Command::new("bowtie2");
-    cmd.arg("-p").arg(threads.to_string())
-        .arg("-x").arg(index_prefix)
-        .arg("-U").arg(reads)
-        .arg("-S").arg(sam_out);
+    cmd.arg("-p")
+        .arg(threads.to_string())
+        .arg("-x")
+        .arg(index_prefix)
+        .arg("-U")
+        .arg(reads)
+        .arg("-S")
+        .arg(sam_out);
 
     if is_fasta {
         cmd.arg("-f");
@@ -160,7 +153,8 @@ pub fn bowtie2_map(
     cmd.stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
 
-    let status = cmd.status()
+    let status = cmd
+        .status()
         .map_err(|e| format!("Failed to run bowtie2: {e}"))?;
 
     if !status.success() {

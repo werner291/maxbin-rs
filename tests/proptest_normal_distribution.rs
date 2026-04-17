@@ -2,7 +2,6 @@
 ///
 /// - NormalDistribution::new() / prob(): covered by normal_dist_equivalence (proptest, 200 cases)
 ///   Inline FFI test: normal_distribution.rs::tests::ffi_equivalence (hardcoded)
-
 use proptest::prelude::*;
 
 proptest! {

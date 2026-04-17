@@ -4,7 +4,6 @@
 /// - EmParams: configuration constants
 /// - EmState: mutable algorithm state
 /// - Free functions for each phase
-
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
@@ -104,11 +103,7 @@ pub fn make_inter_normal() -> NormalDistribution {
 /// get_prob_dist: P(intra) / (P(intra) + P(inter))
 /// Matches EManager.cpp:1017-1023 (get_prob_dist()):
 /// d_intra / (d_inter + d_intra)
-pub fn get_prob_dist(
-    distance: f64,
-    intra: &NormalDistribution,
-    inter: &NormalDistribution,
-) -> f64 {
+pub fn get_prob_dist(distance: f64, intra: &NormalDistribution, inter: &NormalDistribution) -> f64 {
     let d_intra = intra.prob(distance);
     let d_inter = inter.prob(distance);
     d_intra / (d_inter + d_intra)
@@ -354,7 +349,13 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
 
     // Matches EManager.cpp:493: for (run = 0; run < run_time; run++)
     for run in 0..params.max_em {
-        eprintln!("  EM iteration {}/{} ({} contigs, {} bins)", run + 1, params.max_em, seqnum, seed_num);
+        eprintln!(
+            "  EM iteration {}/{} ({} contigs, {} bins)",
+            run + 1,
+            params.max_em,
+            seqnum,
+            seed_num
+        );
         let mut diff_count = 0;
 
         // E-step: Matches EManager.cpp:511-592
@@ -463,14 +464,12 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
                     // Matches EManager.cpp:1108-1111: weight = len * seq_prob; accumulate abundance
                     let weight = len as f64 * state.seq_prob[j][si];
                     for k in 0..ab_num {
-                        state.seed_abundance[si][k] +=
-                            state.seq_abundance[k][j] * weight;
+                        state.seed_abundance[si][k] += state.seq_abundance[k][j] * weight;
                     }
                     // Matches EManager.cpp:1112: d += len * seq_prob
                     d += weight;
                     // Matches EManager.cpp:1114: seed_profile[i]->addProfile(seq_profile[j], len * prob)
-                    state.seed_profiles[si]
-                        .add_profile(&state.seq_profiles[j], weight);
+                    state.seed_profiles[si].add_profile(&state.seq_profiles[j], weight);
                 }
             }
 
@@ -485,7 +484,11 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
 
         // Matches EManager.cpp:611-614: break if stable for STABLE_BIN_COUNT iterations
         if stable_count >= params.stable_bin_count {
-            eprintln!("\r  EM converged after {} iterations ({} changed last iteration)    ", run + 1, diff_count);
+            eprintln!(
+                "\r  EM converged after {} iterations ({} changed last iteration)    ",
+                run + 1,
+                diff_count
+            );
             break;
         }
     }
@@ -611,7 +614,8 @@ pub fn write_results(state: &EmState, output_prefix: &str, params: &EmParams) {
     // Matches EManager.cpp:894-944 (write_result() summary section)
     let summary_path = format!("{}.summary", output_prefix);
     let mut summary = std::io::BufWriter::new(
-        std::fs::File::create(&summary_path).expect("failed to create summary"));
+        std::fs::File::create(&summary_path).expect("failed to create summary"),
+    );
 
     for i in 0..seed_num {
         if state.seed_count[i] > 0 {
@@ -652,17 +656,19 @@ pub fn write_results(state: &EmState, output_prefix: &str, params: &EmParams) {
     // Matches EManager.cpp:947-987: open per-bin fasta files and noclass file, write sequences
     let mut bin_files: Vec<Option<std::io::BufWriter<std::fs::File>>> = (0..seed_num)
         .map(|i| {
-            bin_names[i]
-                .as_ref()
-                .map(|name| std::io::BufWriter::new(
-                    std::fs::File::create(name).expect("failed to create bin file")))
+            bin_names[i].as_ref().map(|name| {
+                std::io::BufWriter::new(
+                    std::fs::File::create(name).expect("failed to create bin file"),
+                )
+            })
         })
         .collect();
 
     // Matches EManager.cpp:956-957: open .noclass file
     let noclass_path = format!("{}.noclass", output_prefix);
     let mut noclass = std::io::BufWriter::new(
-        std::fs::File::create(&noclass_path).expect("failed to create noclass"));
+        std::fs::File::create(&noclass_path).expect("failed to create noclass"),
+    );
 
     for i in 0..seqnum {
         let header_line = format!(">{}\n", state.records[i].header);

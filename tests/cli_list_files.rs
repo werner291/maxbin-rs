@@ -1,11 +1,10 @@
+use maxbin_rs::cli::{Command, PipelineArgs};
 /// Tests for CLI options that lack equivalence test coverage:
 /// -reads_list, -abund_list, -min_contig_length, -markerset.
 ///
 /// These test CLI parsing and file expansion only — not pipeline behavior.
 /// For pipeline equivalence, see tests/pipeline-stages.sh.
-
 use std::io::Write;
-use maxbin_rs::cli::{Command, PipelineArgs};
 
 fn parse(args: &[&str]) -> PipelineArgs {
     let mut full: Vec<&str> = vec!["-contig", "c.fa", "-out", "out", "-abund", "/dev/null"];
@@ -51,8 +50,10 @@ fn reads_list_merges_with_direct_flags() {
     let mut f = tempfile::NamedTempFile::new().unwrap();
     writeln!(f, "/data/list_sample.fq.gz").unwrap();
     let cli = parse(&[
-        "-reads", "/data/direct.fq.gz",
-        "-reads_list", f.path().to_str().unwrap(),
+        "-reads",
+        "/data/direct.fq.gz",
+        "-reads_list",
+        f.path().to_str().unwrap(),
     ]);
     let files = cli.all_reads_files().unwrap();
     assert_eq!(files.len(), 2);

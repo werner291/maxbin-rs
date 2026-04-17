@@ -268,10 +268,7 @@ mod tests {
 
         assert_eq!(rust_table.len(), cpp_table.len());
         for i in 0..rust_table.len() {
-            assert_eq!(
-                rust_table[i], cpp_table[i],
-                "mapping mismatch at index {i}"
-            );
+            assert_eq!(rust_table[i], cpp_table[i], "mapping mismatch at index {i}");
         }
     }
 

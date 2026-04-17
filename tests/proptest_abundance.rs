@@ -5,7 +5,6 @@
 ///   Generators exercise: all four separator types (tab, space, comma, semicolon),
 ///   consecutive separators (the && bug), scientific notation, empty lines,
 ///   edge-case float strings. Both abundance values AND headers are compared.
-
 use proptest::prelude::*;
 use std::io::{Cursor, Write};
 

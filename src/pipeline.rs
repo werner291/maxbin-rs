@@ -8,7 +8,6 @@
 /// 5. Generate seed file from marker gene clusters
 /// 6. Run EM algorithm
 /// 7. Write output files
-
 use crate::cli::{
     CppEmArgs, EmArgs, FilterArgs, GeneCaller, PipelineArgs, SamToAbundArgs, SeedsArgs,
 };
@@ -35,17 +34,20 @@ pub fn filter_contigs(
     let filtered_path = PathBuf::from(format!("{out_prefix}.contig.tmp"));
     let tooshort_path = PathBuf::from(format!("{out_prefix}.tooshort"));
 
-    let mut filtered = std::io::BufWriter::new(std::fs::File::create(&filtered_path)
-        .map_err(|e| format!("Can't create {}: {e}", filtered_path.display()))?);
-    let mut tooshort = std::io::BufWriter::new(std::fs::File::create(&tooshort_path)
-        .map_err(|e| format!("Can't create {}: {e}", tooshort_path.display()))?);
+    let mut filtered = std::io::BufWriter::new(
+        std::fs::File::create(&filtered_path)
+            .map_err(|e| format!("Can't create {}: {e}", filtered_path.display()))?,
+    );
+    let mut tooshort = std::io::BufWriter::new(
+        std::fs::File::create(&tooshort_path)
+            .map_err(|e| format!("Can't create {}: {e}", tooshort_path.display()))?,
+    );
 
     // Matches run_MaxBin.pl:1175-1311 (checkContig): reads the raw FASTA line by line,
     // accumulates sequence, checks length, writes to filtered or tooshort with the
     // ORIGINAL header (including description) and 70-char line wrapping.
     // We must NOT use our FASTA parser here because it truncates headers at whitespace.
-    let file = std::fs::File::open(contig)
-        .map_err(|e| format!("Can't open contig file: {e}"))?;
+    let file = std::fs::File::open(contig).map_err(|e| format!("Can't open contig file: {e}"))?;
     let reader: Box<dyn BufRead> = if contig.extension().and_then(|e| e.to_str()) == Some("gz") {
         // Matches run_MaxBin.pl:1190-1196: gunzip if .gz
         Box::new(std::io::BufReader::new(flate2::read::GzDecoder::new(file)))
@@ -82,7 +84,10 @@ pub fn filter_contigs(
                 }
                 let total = n_filtered + n_tooshort;
                 if total % 10000 == 0 {
-                    eprintln!("  filtering contigs: {} kept, {} too short...", n_filtered, n_tooshort);
+                    eprintln!(
+                        "  filtering contigs: {} kept, {} too short...",
+                        n_filtered, n_tooshort
+                    );
                 }
             }
             current_header = line.to_string();
@@ -100,7 +105,10 @@ pub fn filter_contigs(
             n_tooshort += 1;
         }
     }
-    eprintln!("  filtering contigs: {} kept, {} too short (done)", n_filtered, n_tooshort);
+    eprintln!(
+        "  filtering contigs: {} kept, {} too short (done)",
+        n_filtered, n_tooshort
+    );
 
     Ok((filtered_path, tooshort_path))
 }
@@ -111,17 +119,13 @@ pub fn filter_contigs(
 /// - Filters reads by mismatch count (XM:i: tag + indels from CIGAR) <= 10
 /// - Abundance = sum(matched_bases) / contig_length
 /// - Output sorted by contig name (Perl's `sort keys`)
-pub fn compute_abundance_from_sam(
-    sam_path: &Path,
-    out_path: &Path,
-) -> Result<(), String> {
+pub fn compute_abundance_from_sam(sam_path: &Path, out_path: &Path) -> Result<(), String> {
     use std::collections::BTreeMap; // BTreeMap for sorted output like Perl's `sort keys`
     use std::io::BufRead;
 
     const MAX_MISMATCH: u32 = 10;
 
-    let file = std::fs::File::open(sam_path)
-        .map_err(|e| format!("Can't open SAM: {e}"))?;
+    let file = std::fs::File::open(sam_path).map_err(|e| format!("Can't open SAM: {e}"))?;
     let reader = std::io::BufReader::new(file);
 
     // Matches _getabund.pl:21-22
@@ -181,8 +185,9 @@ pub fn compute_abundance_from_sam(
     }
 
     // Matches _getabund.pl:61-67 — output abundance as sum/length, sorted by name
-    let mut out = std::io::BufWriter::new(std::fs::File::create(out_path)
-        .map_err(|e| format!("Can't create abundance file: {e}"))?);
+    let mut out = std::io::BufWriter::new(
+        std::fs::File::create(out_path).map_err(|e| format!("Can't create abundance file: {e}"))?,
+    );
     for (name, sum) in &contig_sums {
         let len = contig_lengths.get(name).copied().unwrap_or(1);
         let abundance = *sum as f64 / len as f64;
@@ -239,7 +244,10 @@ fn get_mismatch_from_cigar(cigar: &str) -> u32 {
 
 /// Run the `filter` subcommand: filter contigs by minimum length.
 pub fn run_filter(args: &FilterArgs) -> Result<(), String> {
-    eprintln!("Filtering contigs shorter than {} bp...", args.min_contig_length);
+    eprintln!(
+        "Filtering contigs shorter than {} bp...",
+        args.min_contig_length
+    );
     let t = std::time::Instant::now();
     let (filtered, tooshort) = filter_contigs(&args.contig, &args.out, args.min_contig_length)?;
     eprintln!("  done in {:.1}s", t.elapsed().as_secs_f64());
@@ -253,16 +261,31 @@ pub fn run_seeds(args: &SeedsArgs) -> Result<(), String> {
     let seed_file = PathBuf::from(format!("{}.seed", args.out));
     eprintln!("Generating seed file from marker genes...");
     let t = std::time::Instant::now();
-    let seed_result =
-        generate_seeds(&args.hmmout, &args.contig, args.min_contig_length, &seed_file, false);
+    let seed_result = generate_seeds(
+        &args.hmmout,
+        &args.contig,
+        args.min_contig_length,
+        &seed_file,
+        false,
+    );
     if seed_result.is_err() {
         eprintln!("  try harder to dig out marker genes from contigs.");
-        generate_seeds(&args.hmmout, &args.contig, args.min_contig_length, &seed_file, true)?;
+        generate_seeds(
+            &args.hmmout,
+            &args.contig,
+            args.min_contig_length,
+            &seed_file,
+            true,
+        )?;
     }
     let seed_count = std::fs::read_to_string(&seed_file)
         .map(|s| s.lines().filter(|l| !l.trim().is_empty()).count())
         .unwrap_or(0);
-    eprintln!("  done in {:.1}s ({} seeds)", t.elapsed().as_secs_f64(), seed_count);
+    eprintln!(
+        "  done in {:.1}s ({} seeds)",
+        t.elapsed().as_secs_f64(),
+        seed_count
+    );
     eprintln!("  seed file: {}", seed_file.display());
     Ok(())
 }
@@ -274,8 +297,8 @@ pub fn run_em(args: &EmArgs) -> Result<(), String> {
         return Err("No abundance files provided.".into());
     }
 
-    let seed_content = std::fs::read_to_string(&args.seed)
-        .map_err(|e| format!("Can't read seed file: {e}"))?;
+    let seed_content =
+        std::fs::read_to_string(&args.seed).map_err(|e| format!("Can't read seed file: {e}"))?;
     let seed_names: Vec<String> = seed_content
         .lines()
         .map(|l| l.trim().to_string())
@@ -295,11 +318,14 @@ pub fn run_em(args: &EmArgs) -> Result<(), String> {
 
     eprintln!("Loading data...");
     let t_load = std::time::Instant::now();
-    let mut state = crate::emanager::init_em(
-        &args.contig, &abund_path_refs, &seed_names, &params,
+    let mut state = crate::emanager::init_em(&args.contig, &abund_path_refs, &seed_names, &params);
+    eprintln!(
+        "  data loaded in {:.1}s ({} contigs, {} seeds, {} abundance files)",
+        t_load.elapsed().as_secs_f64(),
+        state.records.len(),
+        seed_names.len(),
+        abund_files.len()
     );
-    eprintln!("  data loaded in {:.1}s ({} contigs, {} seeds, {} abundance files)",
-        t_load.elapsed().as_secs_f64(), state.records.len(), seed_names.len(), abund_files.len());
 
     eprintln!("Running Rust EM...");
     let t_em = std::time::Instant::now();
@@ -313,7 +339,10 @@ pub fn run_em(args: &EmArgs) -> Result<(), String> {
     eprintln!("Writing results...");
     let t_write = std::time::Instant::now();
     crate::emanager::write_results(&state, &args.out, &params);
-    eprintln!("  results written in {:.1}s", t_write.elapsed().as_secs_f64());
+    eprintln!(
+        "  results written in {:.1}s",
+        t_write.elapsed().as_secs_f64()
+    );
 
     let bin_count = rename_bins_to_3digit(&args.out);
     eprintln!("Done: {bin_count} bins produced (EM: {em_secs:.1}s)");
@@ -331,11 +360,7 @@ pub fn run_cpp_em(args: &CppEmArgs) -> Result<(), String> {
     eprintln!("  threads: {}", args.thread);
 
     let t = std::time::Instant::now();
-    let em = crate::original_ffi::OriginalEManager::new(
-        &args.contig,
-        &args.abund,
-        &args.out,
-    );
+    let em = crate::original_ffi::OriginalEManager::new(&args.contig, &args.abund, &args.out);
     em.set_thread_num(args.thread as i32);
     let result = em.run(&args.seed);
     let secs = t.elapsed().as_secs_f64();
@@ -425,18 +450,30 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
     let seed_file = PathBuf::from(format!("{}.seed", cli.out));
     eprintln!("Generating seed file from marker genes...");
     // Matches run_MaxBin.pl lines 482-503: first try normal mode, then max_effort
-    let seed_result = generate_seeds(&hmmout, &filtered_contigs, cli.min_contig_length, &seed_file, false);
+    let seed_result = generate_seeds(
+        &hmmout,
+        &filtered_contigs,
+        cli.min_contig_length,
+        &seed_file,
+        false,
+    );
     if seed_result.is_err() {
         eprintln!("Try harder to dig out marker genes from contigs.");
-        generate_seeds(&hmmout, &filtered_contigs, cli.min_contig_length, &seed_file, true)?;
+        generate_seeds(
+            &hmmout,
+            &filtered_contigs,
+            cli.min_contig_length,
+            &seed_file,
+            true,
+        )?;
     }
 
     // Step 6: Run EM
     eprintln!("Running EM algorithm...");
 
     // Read seeds
-    let seed_content = std::fs::read_to_string(&seed_file)
-        .map_err(|e| format!("Can't read seed file: {e}"))?;
+    let seed_content =
+        std::fs::read_to_string(&seed_file).map_err(|e| format!("Can't read seed file: {e}"))?;
     let seed_names: Vec<String> = seed_content
         .lines()
         .map(|l| l.trim().to_string())
@@ -469,22 +506,11 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
     // Step 7: Rewrite summary with completeness, genome size, GC content
     // Matches run_MaxBin.pl:831-884
     let total_abund_count = abund_files.len();
-    rewrite_summary(
-        &cli.out,
-        bin_count,
-        total_abund_count,
-        &hmmout,
-        &marker_hmm,
-    )?;
+    rewrite_summary(&cli.out, bin_count, total_abund_count, &hmmout, &marker_hmm)?;
 
     // Step 8: Write .marker file (marker gene counts per bin)
     // Matches run_MaxBin.pl:818 (countmarker call)
-    write_marker_counts(
-        &hmmout,
-        &cli.out,
-        bin_count,
-        &marker_hmm,
-    )?;
+    write_marker_counts(&hmmout, &cli.out, bin_count, &marker_hmm)?;
 
     // Step 9: Clean up intermediate files (unless --preserve-intermediate)
     if !cli.preserve_intermediate {
@@ -550,16 +576,15 @@ fn generate_seeds(
     const COV_CUTOFF: f64 = 0.4;
 
     // Read contig lengths from the FASTA file
-    let records = fasta::parse_file(contig_file)
-        .map_err(|e| format!("Failed to parse contigs: {e}"))?;
+    let records =
+        fasta::parse_file(contig_file).map_err(|e| format!("Failed to parse contigs: {e}"))?;
     let contig_lengths: HashMap<String, usize> = records
         .iter()
         .map(|r| (r.header.clone(), r.len()))
         .collect();
 
     // Parse HMM domtblout output
-    let file = std::fs::File::open(hmmout)
-        .map_err(|e| format!("Can't open HMM output: {e}"))?;
+    let file = std::fs::File::open(hmmout).map_err(|e| format!("Can't open HMM output: {e}"))?;
     let reader = std::io::BufReader::new(file);
 
     // For each marker gene: track unique contigs that hit it, and the query length
@@ -613,11 +638,14 @@ fn generate_seeds(
             if !current_marker.is_empty() && !current_contigs.is_empty() {
                 let idx = markers.len();
                 marker_index.insert(current_marker.clone(), idx);
-                markers.push((current_marker.clone(), MarkerInfo {
-                    contigs: current_contigs.clone(),
-                    contig_set: current_contig_set.clone(),
-                    query_len: current_query_len,
-                }));
+                markers.push((
+                    current_marker.clone(),
+                    MarkerInfo {
+                        contigs: current_contigs.clone(),
+                        contig_set: current_contig_set.clone(),
+                        query_len: current_query_len,
+                    },
+                ));
             }
             current_marker = marker.clone();
             current_query_len = query_len;
@@ -636,11 +664,14 @@ fn generate_seeds(
     }
     // Flush the last marker
     if !current_marker.is_empty() && !current_contigs.is_empty() {
-        markers.push((current_marker, MarkerInfo {
-            contigs: current_contigs,
-            contig_set: current_contig_set,
-            query_len: current_query_len,
-        }));
+        markers.push((
+            current_marker,
+            MarkerInfo {
+                contigs: current_contigs,
+                contig_set: current_contig_set,
+                query_len: current_query_len,
+            },
+        ));
     }
 
     if markers.is_empty() {
@@ -668,8 +699,10 @@ fn generate_seeds(
             // Matches _getmarker.pl lines 176-221
             let mut sorted_contigs: Vec<(&String, &usize)> = contig_lengths.iter().collect();
             sorted_contigs.sort_by(|a, b| b.1.cmp(a.1));
-            let mut out = std::io::BufWriter::new(std::fs::File::create(seed_file)
-                .map_err(|e| format!("Can't create seed file: {e}"))?);
+            let mut out = std::io::BufWriter::new(
+                std::fs::File::create(seed_file)
+                    .map_err(|e| format!("Can't create seed file: {e}"))?,
+            );
 
             if let Some((name, _)) = sorted_contigs.first() {
                 writeln!(out, "{name}").map_err(|e| e.to_string())?;
@@ -711,8 +744,9 @@ fn generate_seeds(
     let mut sorted_seeds = seed_contigs.clone();
     sorted_seeds.sort();
 
-    let mut out = std::io::BufWriter::new(std::fs::File::create(seed_file)
-        .map_err(|e| format!("Can't create seed file: {e}"))?);
+    let mut out = std::io::BufWriter::new(
+        std::fs::File::create(seed_file).map_err(|e| format!("Can't create seed file: {e}"))?,
+    );
 
     for contig in &sorted_seeds {
         writeln!(out, "{contig}").map_err(|e| e.to_string())?;
@@ -750,7 +784,11 @@ fn get_bin_info(fasta_path: &Path) -> (usize, f64) {
             }
         }
     }
-    let gc_pct = if total == 0 { 0.0 } else { gc as f64 / total as f64 * 100.0 };
+    let gc_pct = if total == 0 {
+        0.0
+    } else {
+        gc as f64 / total as f64 * 100.0
+    };
     (total, gc_pct)
 }
 
@@ -767,8 +805,8 @@ fn rewrite_summary(
 
     // Read the C++ summary to get abundance values
     let summary_path = format!("{output_prefix}.summary");
-    let raw_summary = std::fs::read_to_string(&summary_path)
-        .map_err(|e| format!("Can't read summary: {e}"))?;
+    let raw_summary =
+        std::fs::read_to_string(&summary_path).map_err(|e| format!("Can't read summary: {e}"))?;
 
     // Parse abundance per bin from the C++ summary format: "Bin [name]\tvalue"
     let mut bin_abundances: Vec<String> = Vec::new();
@@ -785,13 +823,17 @@ fn rewrite_summary(
     let completeness = compute_completeness(hmmout, output_prefix, bin_count, marker_hmm)?;
 
     // Write final summary
-    let mut out = std::io::BufWriter::new(std::fs::File::create(&summary_path)
-        .map_err(|e| format!("Can't write summary: {e}"))?);
+    let mut out = std::io::BufWriter::new(
+        std::fs::File::create(&summary_path).map_err(|e| format!("Can't write summary: {e}"))?,
+    );
 
     // Matches run_MaxBin.pl:835-841
     if abund_count == 1 {
-        writeln!(out, "Bin name\tAbundance\tCompleteness\tGenome size\tGC content")
-            .map_err(|e| e.to_string())?;
+        writeln!(
+            out,
+            "Bin name\tAbundance\tCompleteness\tGenome size\tGC content"
+        )
+        .map_err(|e| e.to_string())?;
     } else {
         writeln!(out, "Bin name\tCompleteness\tGenome size\tGC content")
             .map_err(|e| e.to_string())?;
@@ -813,11 +855,17 @@ fn rewrite_summary(
         // The Perl formats abundance with printf "%0.2f"
         let abund_fmt: f64 = abund.parse().unwrap_or(0.0);
         if abund_count == 1 {
-            writeln!(out, "{out_name}.{bin_num}.fasta\t{abund_fmt:.2}\t{compl:.1}%\t{genome_size}\t{gc:.1}")
-                .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
+                "{out_name}.{bin_num}.fasta\t{abund_fmt:.2}\t{compl:.1}%\t{genome_size}\t{gc:.1}"
+            )
+            .map_err(|e| e.to_string())?;
         } else {
-            writeln!(out, "{out_name}.{bin_num}.fasta\t{compl:.1}%\t{genome_size}\t{gc:.1}")
-                .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
+                "{out_name}.{bin_num}.fasta\t{compl:.1}%\t{genome_size}\t{gc:.1}"
+            )
+            .map_err(|e| e.to_string())?;
         }
     }
 
@@ -837,8 +885,8 @@ fn compute_completeness(
 
     // Read marker gene names from the HMM file
     // Matches _getmarker.pl:306-325
-    let hmm_file = std::fs::File::open(marker_hmm)
-        .map_err(|e| format!("Can't open marker HMM: {e}"))?;
+    let hmm_file =
+        std::fs::File::open(marker_hmm).map_err(|e| format!("Can't open marker HMM: {e}"))?;
     let mut marker_names: Vec<String> = Vec::new();
     let mut marker_index: HashMap<String, usize> = HashMap::new();
     for line in std::io::BufReader::new(hmm_file).lines() {
@@ -870,8 +918,7 @@ fn compute_completeness(
     // Parse HMM output, count markers per bin
     // Matches _getmarker.pl:327-365
     let mut unique_markers: Vec<HashSet<usize>> = vec![HashSet::new(); bin_count];
-    let file = std::fs::File::open(hmmout)
-        .map_err(|e| format!("Can't open HMM output: {e}"))?;
+    let file = std::fs::File::open(hmmout).map_err(|e| format!("Can't open HMM output: {e}"))?;
     for line in std::io::BufReader::new(file).lines() {
         let line = line.map_err(|e| e.to_string())?;
         if line.starts_with('#') {
@@ -924,8 +971,8 @@ fn write_marker_counts(
     use std::io::BufRead;
 
     // Read marker names from HMM file
-    let hmm_file = std::fs::File::open(marker_hmm)
-        .map_err(|e| format!("Can't open marker HMM: {e}"))?;
+    let hmm_file =
+        std::fs::File::open(marker_hmm).map_err(|e| format!("Can't open marker HMM: {e}"))?;
     let mut marker_names: Vec<String> = Vec::new();
     let mut marker_index: HashMap<String, usize> = HashMap::new();
     for line in std::io::BufReader::new(hmm_file).lines() {
@@ -955,8 +1002,7 @@ fn write_marker_counts(
 
     // Count markers per bin per gene
     let mut counts: Vec<Vec<u32>> = vec![vec![0; gene_num]; bin_count];
-    let file = std::fs::File::open(hmmout)
-        .map_err(|e| format!("Can't open HMM output: {e}"))?;
+    let file = std::fs::File::open(hmmout).map_err(|e| format!("Can't open HMM output: {e}"))?;
     for line in std::io::BufReader::new(file).lines() {
         let line = line.map_err(|e| e.to_string())?;
         if line.starts_with('#') {
@@ -990,8 +1036,10 @@ fn write_marker_counts(
     // Write .marker file
     // Matches _getmarker.pl:382-405
     let marker_path = format!("{output_prefix}.marker");
-    let mut out = std::io::BufWriter::new(std::fs::File::create(&marker_path)
-        .map_err(|e| format!("Can't create marker file: {e}"))?);
+    let mut out = std::io::BufWriter::new(
+        std::fs::File::create(&marker_path)
+            .map_err(|e| format!("Can't create marker file: {e}"))?,
+    );
 
     let out_name = Path::new(output_prefix)
         .file_name()
