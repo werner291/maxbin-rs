@@ -313,7 +313,7 @@ pub fn run_em(args: &EmArgs) -> Result<(), String> {
     let params = crate::emanager::EmParams {
         min_seq_length: args.min_contig_length,
         max_em: args.max_iteration,
-        min_prob_threshold: args.prob_threshold,
+        min_prob_threshold: args.prob_threshold(),
         ..Default::default()
     };
 
@@ -498,7 +498,7 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
     let params = crate::emanager::EmParams {
         min_seq_length: cli.min_contig_length,
         max_em: cli.max_iteration,
-        min_prob_threshold: cli.prob_threshold,
+        min_prob_threshold: cli.prob_threshold(),
         ..Default::default()
     };
 

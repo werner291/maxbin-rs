@@ -5,18 +5,24 @@
 #
 #   nix build .#dockerTest
 
-{ pkgs, dockerImage, datasets }:
+{
+  pkgs,
+  dockerImage,
+  datasets,
+}:
 
 pkgs.testers.runNixOSTest {
   name = "maxbin-rs-docker";
 
-  nodes.machine = { ... }: {
-    virtualisation = {
-      docker.enable = true;
-      diskSize = 4096;
-      memorySize = 2048;
+  nodes.machine =
+    { ... }:
+    {
+      virtualisation = {
+        docker.enable = true;
+        diskSize = 4096;
+        memorySize = 2048;
+      };
     };
-  };
 
   testScript = ''
     machine.wait_for_unit("docker.service")
