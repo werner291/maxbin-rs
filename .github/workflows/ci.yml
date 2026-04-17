@@ -29,3 +29,8 @@ jobs:
 
       - name: Format check
         run: nix develop -c cargo fmt --check
+
+      - name: Docker VM test
+        run: |
+          sudo chmod 666 /dev/kvm
+          nix build .#dockerTest
