@@ -181,7 +181,7 @@
 
         # `nix develop` drops you into this shell with all tools available.
         devShells.default = pkgs.mkShell {
-          buildInputs = [ rust pkgs.cargo-nextest pkgs.gh maxbin2 ];
+          buildInputs = [ rust pkgs.cargo-nextest pkgs.gh pkgs.cachix maxbin2 ];
           # Environment variables available inside the devshell:
           MAXBIN2_TEST_CONTIGS = "${datasets.bfragilis.contigs}";
           MAXBIN2_TEST_READS1 = "${datasets.bfragilis.reads1}";

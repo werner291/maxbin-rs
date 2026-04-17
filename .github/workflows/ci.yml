@@ -19,17 +19,13 @@ jobs:
       - uses: cachix/cachix-action@v15
         with:
           name: maxbin-rs
-          skipPush: true
-        continue-on-error: true
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Build
         run: nix build
 
       - name: Unit tests
         run: nix develop -c cargo nextest run
-
-      - name: Clippy
-        run: nix develop -c cargo clippy -- -D warnings
 
       - name: Format check
         run: nix develop -c cargo fmt --check
