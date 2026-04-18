@@ -34,6 +34,7 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    crane.url = "github:ipetkov/crane";
   };
 
   # `outputs` defines what this flake produces. Currently x86_64-linux only;
@@ -44,6 +45,7 @@
       nixpkgs,
       flake-utils,
       rust-overlay,
+      crane,
     }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (
       system:
@@ -65,6 +67,27 @@
           cargo = rust;
           rustc = rust;
         };
+
+        # Crane — builds Rust with cached dependency artifacts.
+        # Dependencies are built once (craneLib.buildDepsOnly), then source
+        # changes only rebuild our code, not all of crates.io.
+        craneLib = (crane.mkLib pkgs).overrideToolchain rust;
+        # Include Rust source + files needed by build.rs (FFI wrappers,
+        # patches) and tests (fixtures, test scripts).
+        src = pkgs.lib.cleanSourceWith {
+          src = ./.;
+          filter =
+            path: type:
+            (craneLib.filterCargoSources path type) || builtins.match ".*/(nix|vendor|tests)/.*" path != null;
+        };
+        commonArgs = {
+          inherit src;
+          pname = "maxbin-rs";
+          version = "0.2.0";
+          MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+        };
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
         # =====================================================================
         # Packages
@@ -106,49 +129,45 @@
         });
 
         # The Rust reimplementation — this is the main output of this project.
-        maxbin-rs = pkgs.rustPlatform.buildRustPackage {
-          pname = "maxbin-rs";
-          version = "0.1.3";
-          src = ./.;
-          cargoHash = "sha256-VWEJA/ZJoxXLjAXmC7zzD5JBIXZraPDWaQWGNoMwPsY=";
-          # build.rs extracts C++ source from this tarball for FFI testing.
-          MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
-          # Wrap the binary so HMMER, Bowtie2, and FragGeneScan are on $PATH
-          # at runtime — no manual 'setting' file needed.
-          postInstall = ''
-            cp ${maxbin2}/libexec/maxbin2/marker.hmm $out/bin/
-            cp ${maxbin2}/libexec/maxbin2/bacar_marker.hmm $out/bin/
-            wrapProgram $out/bin/maxbin-rs \
-              --prefix PATH : "${
-                pkgs.lib.makeBinPath [
-                  pkgs.hmmer
-                  pkgs.bowtie2
-                ]
-              }:${fraggenescan}/libexec/FragGeneScan"
-          '';
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-        };
+        maxbin-rs = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            # Wrap the binary so HMMER, Bowtie2, and FragGeneScan are on $PATH
+            # at runtime — no manual 'setting' file needed.
+            postInstall = ''
+              cp ${maxbin2}/libexec/maxbin2/marker.hmm $out/bin/
+              cp ${maxbin2}/libexec/maxbin2/bacar_marker.hmm $out/bin/
+              wrapProgram $out/bin/maxbin-rs \
+                --prefix PATH : "${
+                  pkgs.lib.makeBinPath [
+                    pkgs.hmmer
+                    pkgs.bowtie2
+                  ]
+                }:${fraggenescan}/libexec/FragGeneScan"
+            '';
+          }
+        );
 
         # Same as maxbin-rs but with C++ LTO enabled for the FFI library.
         # Used for A/B benchmarking to test whether -flto closes the ~8x gap.
-        maxbin-rs-lto = pkgs.rustPlatform.buildRustPackage {
-          pname = "maxbin-rs-lto";
-          version = "0.1.3";
-          src = ./.;
-          cargoHash = "sha256-VWEJA/ZJoxXLjAXmC7zzD5JBIXZraPDWaQWGNoMwPsY=";
-          MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
-          MAXBIN2_CPP_LTO = "1";
-          postInstall = ''
-            wrapProgram $out/bin/maxbin-rs \
-              --prefix PATH : "${
-                pkgs.lib.makeBinPath [
-                  pkgs.hmmer
-                  pkgs.bowtie2
-                ]
-              }:${fraggenescan}/libexec/FragGeneScan"
-          '';
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-        };
+        maxbin-rs-lto = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            pname = "maxbin-rs-lto";
+            MAXBIN2_CPP_LTO = "1";
+            postInstall = ''
+              wrapProgram $out/bin/maxbin-rs \
+                --prefix PATH : "${
+                  pkgs.lib.makeBinPath [
+                    pkgs.hmmer
+                    pkgs.bowtie2
+                  ]
+                }:${fraggenescan}/libexec/FragGeneScan"
+            '';
+          }
+        );
 
         # =====================================================================
         # Test data and pre-computed intermediates
@@ -399,26 +418,20 @@
                 nixfmt --check flake.nix nix/*.nix
                 touch $out
               '';
-          clippy = (
-            rustPlatform.buildRustPackage {
-              pname = "maxbin-rs-clippy";
-              version = "0.1.3";
-              src = ./.;
-              cargoHash = "sha256-VWEJA/ZJoxXLjAXmC7zzD5JBIXZraPDWaQWGNoMwPsY=";
-              MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
-              buildPhase = "cargo clippy --tests -- -D warnings";
-              installPhase = "touch $out";
-              doCheck = false;
-              dontFixup = true;
+          clippy = craneLib.cargoClippy (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              cargoClippyExtraArgs = "--tests -- -D warnings";
             }
           );
-          tests = maxbin-rs.overrideAttrs (old: {
-            pname = "maxbin-rs-tests";
-            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
-            buildPhase = "cargo nextest run";
-            installPhase = "touch $out";
-            dontFixup = true;
-          });
+          tests = craneLib.cargoNextest (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
+            }
+          );
           inherit (tests) test-pipeline-stages test-cli test-cli-equivalence;
           inherit dockerTest;
           # End-to-end recursive equivalence: f64-patched C++ vs Rust on
