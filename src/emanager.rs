@@ -245,6 +245,72 @@ pub fn init_em(
     }
 }
 
+/// E-step for a single contig: compute dist_prob, abund_prob, combine into
+/// seq_prob, and pick the best bin. Returns None if the contig is skipped
+/// (too short or all-N), otherwise returns (seq_prob_row, best_bin).
+fn e_step_for_contig(
+    i: usize,
+    state: &EmState,
+    seed_num: usize,
+    intra: &crate::normal_distribution::NormalDistribution,
+    inter: &crate::normal_distribution::NormalDistribution,
+    params: &EmParams,
+) -> Option<(Vec<f64>, i32)> {
+    if state.records[i].len() < params.min_seq_length || state.is_profile_n[i] {
+        return None;
+    }
+
+    // Compute tetranucleotide distance probabilities
+    let mut dist_prob = vec![0.0f64; seed_num];
+    let mut sum = 0.0f64;
+    for (dp, seed_prof) in dist_prob.iter_mut().zip(state.seed_profiles.iter()) {
+        let d = crate::distance::euc_dist_profiles(
+            state.seq_profiles[i].get_profile(),
+            seed_prof.get_profile(),
+        );
+        *dp = get_prob_dist(d, intra, inter);
+        if *dp < params.very_small_double {
+            *dp = params.very_small_double;
+        }
+        sum += *dp;
+    }
+    for dp in dist_prob.iter_mut() {
+        *dp /= sum;
+    }
+
+    // Compute abundance probabilities
+    let abund_prob = compute_abund_prob_for_contig(
+        i,
+        &state.seq_abundance,
+        &state.seed_abundance,
+        params.very_small_double,
+    );
+
+    // Combine dist_prob and abund_prob into seq_prob
+    let mut probs = vec![0.0f64; seed_num];
+    let mut sum = 0.0f64;
+    for (j, (&dp, ap_row)) in dist_prob.iter().zip(abund_prob.iter()).enumerate() {
+        probs[j] = dp;
+        for &ap in ap_row {
+            probs[j] *= ap;
+        }
+        sum += probs[j];
+    }
+
+    // Normalize and find best bin
+    let mut max = 0.0f64;
+    let mut best_bin: i32 = -1;
+    for j in 0..seed_num {
+        probs[j] /= sum;
+        if max < probs[j] {
+            max = probs[j];
+            best_bin = j as i32;
+        }
+    }
+
+    Some((probs, best_bin))
+}
+
 /// Compute abundance probabilities for contig `i` across all abundance files.
 /// Matches EManager.cpp:1061-1081 (threadfunc_E()): each abundance file `k`
 /// is independent. The C++ parallelizes this over `k` via ThreadPool.
@@ -347,8 +413,6 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
     // Matches EManager.cpp:492: stable_count = 0
     let mut stable_count = 0;
 
-    let mut dist_prob = vec![0.0f64; seed_num];
-
     // Matches EManager.cpp:493: for (run = 0; run < run_time; run++)
     for run in 0..params.max_em {
         eprintln!(
@@ -358,82 +422,34 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
             seqnum,
             seed_num
         );
-        let mut diff_count = 0;
-
         // E-step: Matches EManager.cpp:511-592
-        for i in 0..seqnum {
-            // Matches EManager.cpp:514: if (seq len >= min_seq_length && !is_profile_N)
-            if state.records[i].len() >= params.min_seq_length && !state.is_profile_n[i] {
-                // Matches EManager.cpp:516-531: compute tetranucleotide dist probabilities
-                let mut sum = 0.0f64;
-                for (dp, seed_prof) in dist_prob.iter_mut().zip(state.seed_profiles.iter()) {
-                    let d = distance::euc_dist_profiles(
-                        state.seq_profiles[i].get_profile(),
-                        seed_prof.get_profile(),
-                    );
-                    *dp = get_prob_dist(d, &intra, &inter);
-                    // Matches EManager.cpp:522-525: clamp to VERY_SMALL_DOUBLE
-                    if *dp < params.very_small_double {
-                        *dp = params.very_small_double;
-                    }
-                    sum += *dp;
-                }
-                // Matches EManager.cpp:528-531: normalize dist_prob
-                for dp in dist_prob.iter_mut() {
-                    *dp /= sum;
-                }
+        // Each contig's computation is independent: dist_prob, abund_prob,
+        // seq_prob[i], and seq_bin[i] don't depend on other contigs.
+        // When thread > 1, parallelize with Rayon. The M-step stays
+        // sequential so float accumulation order is deterministic.
+        let e_step_result: Vec<Option<(Vec<f64>, i32)>> = if use_parallel {
+            pool.install(|| {
+                use rayon::prelude::*;
+                (0..seqnum)
+                    .into_par_iter()
+                    .map(|i| e_step_for_contig(i, state, seed_num, &intra, &inter, params))
+                    .collect()
+            })
+        } else {
+            (0..seqnum)
+                .map(|i| e_step_for_contig(i, state, seed_num, &intra, &inter, params))
+                .collect()
+        };
 
-                // Compute abundance probabilities (threadfunc_E equivalent)
-                // Matches EManager.cpp:1061-1081 (threadfunc_E()): for each abundance file.
-                // The C++ parallelizes this over abundance files via ThreadPool;
-                // we do the same with Rayon when thread_num > 1.
-                let abund_prob = if use_parallel {
-                    pool.install(|| {
-                        compute_abund_prob_for_contig_par(
-                            i,
-                            &state.seq_abundance,
-                            &state.seed_abundance,
-                            params.very_small_double,
-                        )
-                    })
-                } else {
-                    compute_abund_prob_for_contig(
-                        i,
-                        &state.seq_abundance,
-                        &state.seed_abundance,
-                        params.very_small_double,
-                    )
-                };
-
-                // Matches EManager.cpp:555-568: combine dist_prob and abund_prob
-                let mut sum = 0.0f64;
-                for (j, (&dp, ap_row)) in dist_prob.iter().zip(abund_prob.iter()).enumerate() {
-                    // Matches EManager.cpp:562: seq_prob[i][j] = dist_prob[j]
-                    state.seq_prob[i][j] = dp;
-                    // Matches EManager.cpp:564-566: multiply by each abundance probability
-                    for &ap in ap_row {
-                        state.seq_prob[i][j] *= ap;
-                    }
-                    sum += state.seq_prob[i][j];
-                }
-
-                // Matches EManager.cpp:570-589: normalize seq_prob, find best bin
-                let mut max = 0.0f64;
-                let mut tempbin: i32 = -1;
-                for j in 0..seed_num {
-                    state.seq_prob[i][j] /= sum;
-                    if max < state.seq_prob[i][j] {
-                        max = state.seq_prob[i][j];
-                        tempbin = j as i32;
-                    }
-                }
-
-                // Matches EManager.cpp:585-589: update seq_bin, count changes
-                if state.seq_bin[i] != tempbin {
+        // Apply E-step results to state (sequential — deterministic)
+        let mut diff_count = 0;
+        for (i, result) in e_step_result.into_iter().enumerate() {
+            if let Some((probs, new_bin)) = result {
+                state.seq_prob[i] = probs;
+                if state.seq_bin[i] != new_bin {
                     diff_count += 1;
-                    state.seq_bin[i] = tempbin;
+                    state.seq_bin[i] = new_bin;
                 }
-                // Matches EManager.cpp:591: is_estimated[i] = true
                 state.is_estimated[i] = true;
             }
         }
