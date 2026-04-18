@@ -113,13 +113,6 @@ Remaining:
 - [ ] **Summary sprintf rounding** — C++ uses `%0.4Lf` (long double) vs Rust `{:.4}`
   (f64). Rounding at the 4th decimal boundary could differ due to different input
   precision. Cosmetic — affects summary file, not bins.
-- [ ] **Seed ordering always deterministic** — seeds are always sorted alphabetically.
-  The `MAXBIN_RS_DETERMINISTIC` env var documented in README is never read; the random
-  shuffle path (matching the original's Perl hash iteration randomness) is not implemented.
-  README claims the env var controls this. Either implement the shuffle or update docs.
-- [ ] **Abundance file header stripping** — original strips leading `>` from abundance
-  headers (run_MaxBin.pl:1505-1532 `checkAbundFile`). We don't, so abundance files
-  with `>contig_name\tabundance` format will fail to match FASTA headers.
 
 Moderate — missing features:
 
