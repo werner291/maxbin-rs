@@ -116,11 +116,16 @@ Remaining:
 
 Moderate — missing features:
 
-- [ ] `-verbose` flag accepted but silently ignored (original passes to C++ core)
+- [ ] `-verbose` flag accepted but silently ignored (original passes to C++ core).
+  Consider using `env_logger` / `RUST_LOG` in v0.2+.
 - [ ] `-plotmarker` flag accepted but silently ignored (original generates heatmap PDF via R)
-- [ ] No `.log` file output (original writes structured log to `$out_f.log`)
 - [ ] No `.abundance` file for multi-sample runs (run_MaxBin.pl:841-851)
-- [ ] No per-bin marker tarball (`marker_of_each_bin.tar.gz`)
+- [ ] No per-bin marker tarball (`marker_of_each_bin.tar.gz`). The original runs
+  `listmarker_bybin()` (_getmarker.pl) which reads the HMMER domain table and
+  gene caller protein FASTA (`frag.faa`), extracts marker gene sequences per bin
+  into `*.marker.fasta` files, then tars them. Requires gene caller output.
+  nf-core/mag collects this as `optional: true`, so not a pipeline blocker, but
+  users inspecting bin quality may expect it.
 - [ ] `-reassembly` flag not accepted (original does IDBA-UD reassembly per bin)
 
 Minor:
