@@ -233,7 +233,7 @@
               }
               ''
                 # Filter full CAMI contigs
-                maxbin-rs filter -contig ${datasets.cami-i-high.contigs} -out $TMPDIR/full 2>/dev/null
+                maxbin-rs filter --contig ${datasets.cami-i-high.contigs} --out $TMPDIR/full 2>/dev/null
 
                 # Take first 5000 filtered contigs
                 awk '/^>/{n++} n>5000{exit} {print}' $TMPDIR/full.contig.tmp > $TMPDIR/small.fa
@@ -261,7 +261,7 @@
 
                 # Generate seeds from subsetted HMMER output
                 MAXBIN_RS_DETERMINISTIC=1 maxbin-rs seeds \
-                  -contig $out/contigs.fa -hmmout $out/hmmout -out $TMPDIR/seeds 2>/dev/null
+                  --contig $out/contigs.fa --hmmout $out/hmmout --out $TMPDIR/seeds 2>/dev/null
                 cp $TMPDIR/seeds.seed $out/seed
 
                 echo "=== cami-small summary ==="
