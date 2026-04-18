@@ -80,7 +80,8 @@ lack of ongoing maintenance rather than poor original engineering.
   files typically use a single tab, but would misparse files with e.g. `\t\t`.
   (observed directly in `AbundanceLoader.cpp`)
   [SourceForge ticket #7](https://sourceforge.net/p/maxbin2/tickets/7/)
-- [ ] Same contigs in multiple bins
+- [ ] Same contigs in multiple bins — unconfirmed report, no repro steps.
+  Structurally impossible in our implementation (seq_bin[i] is a single int).
   [SourceForge ticket #10](https://sourceforge.net/p/maxbin2/tickets/10/)
 - [ ] Marker gene detection fails on valid data (CheckM finds 568 genes, MaxBin2 finds <=1)
   [SourceForge ticket #6](https://sourceforge.net/p/maxbin2/tickets/6/)
