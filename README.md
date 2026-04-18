@@ -1,12 +1,11 @@
 # maxbin-rs
 
-**Status: Work in progress.** Component-level equivalence is verified via
-FFI tests (112 tests), and end-to-end output matches on small datasets.
-Recursive binning is implemented but has a known 9-contig divergence on
-larger metagenomes due to float precision differences. Reads format
-detection has edge cases that can silently produce wrong results.
-**Do not use in production pipelines or spend significant time testing yet.** 
-If you want to experiment, please report issues.
+**Status: Equivalence-tested, not yet pipeline-tested.** At the same float
+width (`double`/`f64`), all output is bit-for-bit identical to MaxBin2 2.2.7
+through 5 levels of recursive binning. The only divergence is the original's
+use of 80-bit `long double` on x86-64 Linux (~4 contigs on CAMI I High).
+~8x faster EM core. Not yet tested inside nf-core/mag or other pipelines —
+if you try it, please report issues.
 
 ---
 
@@ -168,15 +167,39 @@ approximately 8x faster than the original C++ EM (see
 - Correctness bugs (prob_threshold default, duplicate contigs, etc.)
 - FragGeneScan → Prodigal switch
 - GTDB marker gene sets
-- nf-core/mag drop-in module
+- Per-bin marker gene tarball (`marker_of_each_bin.tar.gz`)
+- Multi-sample `.abundance` output file
+
+## nf-core/mag compatibility
+
+The goal is a drop-in replacement for the MaxBin2 module in
+[nf-core/mag](https://nf-co.re/mag). Current status:
+
+**Works**: `-contig`, `-abund` (including `-abund2`, `-abund3` etc),
+`-reads`, `-thread`, `-out`, `-min_contig_length`, `-max_iteration`,
+`-prob_threshold`, `-markerset`. Output files: `*.fasta` bins,
+`.noclass`, `.tooshort`, `.summary`, `.marker`, `.log`.
+
+**Missing**: per-bin marker tarball (`marker_of_each_bin.tar.gz`),
+multi-sample `.abundance` file. Both are `optional: true` in the
+nf-core module and won't crash the pipeline.
+
+**Not tested in a real nf-core/mag run yet.** The equivalence tests
+compare output files against the original, but the tool has not been
+swapped into an actual nf-core pipeline run. If you try this, please
+report any issues.
 
 ## Versioning
 
 See [VERSIONING.md](VERSIONING.md) for the full policy. In short:
 
-- **v0.1.x** — bug-for-bug compatible with the original MaxBin2. Drop-in replacement (not yet externally verified).
-- **v0.2.x** — correctness fixes that change output (e.g., `prob_threshold` default, duplicate contigs).
-- **v0.3+** — new features (Prodigal, GTDB markers, etc.).
+- **v0.1.x** — bug-for-bug compatible with the original MaxBin2.
+  Output is bit-identical at the same float width. Intended as a
+  drop-in replacement, but not yet tested inside real pipelines.
+- **v0.2.x** — correctness fixes that change output (e.g.,
+  `prob_threshold` default, duplicate contigs).
+- **v0.3+** — new features (Prodigal, GTDB markers, parallelized
+  outer loop, nf-core/mag module).
 
 "Breaking change" means "changes binning output on the same input." Crash fixes,
 better errors, and performance improvements are never breaking.
