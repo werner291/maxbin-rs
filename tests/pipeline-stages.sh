@@ -309,11 +309,14 @@ CPP_DIR=$(mktemp -d)
 RUST_DIR=$(mktemp -d)
 
 # Subcommands: run C++ EM and Rust EM separately. Each reports its own timing.
+# Both use prob_threshold=0.5 to match the C++ FFI's hardcoded default.
+# (Our default changed to 0.9 in v0.2, but the FFI can't be overridden.)
 maxbin-rs cpp-em --contig "$FILTERED_CONTIGS" --abund "$ORIG_ABUND" \
   --seed "$ORIG_SEED" --out "$CPP_DIR/test" --thread 1
 
 maxbin-rs em --contig "$FILTERED_CONTIGS" --abund "$ORIG_ABUND" \
-  --seed "$ORIG_SEED" --out "$RUST_DIR/test" --thread 1
+  --seed "$ORIG_SEED" --out "$RUST_DIR/test" --thread 1 \
+  --prob-threshold 0.5
 
 # Compare outputs.
 echo ""
