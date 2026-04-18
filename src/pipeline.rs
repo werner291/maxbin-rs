@@ -754,6 +754,21 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         }
     }
 
+    // Step 10: Write .log file
+    // Matches run_MaxBin.pl:390 (openLOG). The original writes all progress
+    // output here. We write a minimal log so downstream pipelines (e.g.
+    // nf-core/mag) that glob for *.log don't fail.
+    {
+        let log_path = format!("{}.log", cli.out);
+        let mut log = std::io::BufWriter::new(
+            std::fs::File::create(&log_path).map_err(|e| format!("Can't create log file: {e}"))?,
+        );
+        writeln!(log, "maxbin-rs {}", env!("CARGO_PKG_VERSION")).map_err(|e| e.to_string())?;
+        writeln!(log, "Input: {}", cli.contig.display()).map_err(|e| e.to_string())?;
+        writeln!(log, "Output: {}", cli.out).map_err(|e| e.to_string())?;
+        writeln!(log, "Bins: {bin_count}").map_err(|e| e.to_string())?;
+    }
+
     eprintln!("\n========== Job finished ==========");
     Ok(())
 }
