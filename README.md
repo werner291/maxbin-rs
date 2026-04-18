@@ -170,23 +170,47 @@ approximately 8x faster than the original C++ EM (see
 - Per-bin marker gene tarball (`marker_of_each_bin.tar.gz`)
 - Multi-sample `.abundance` output file
 
-## nf-core/mag compatibility
+## Compatibility
+
+### What works
+
+All CLI flags accepted by the original: `-contig`, `-abund` (including
+`-abund2`, `-abund3` etc), `-reads`, `-thread`, `-out`,
+`-min_contig_length`, `-max_iteration`, `-prob_threshold`, `-markerset`,
+`-verbose`, `-plotmarker`. Output files: `*.fasta` bins, `.noclass`,
+`.tooshort`, `.summary`, `.marker`, `.log`.
+
+### Known differences from the original
+
+These are intentional or unavoidable and should not affect correctness:
+
+- **Binary name**: `maxbin-rs`, not `run_MaxBin.pl`. Pipeline modules
+  that hardcode the binary name need updating.
+- **Version output**: `maxbin-rs 0.1.3` (via `-v` or `--version`),
+  not `MaxBin 2.2.7`. Pipelines that parse version strings (e.g.
+  nf-core/mag's `sed 's/MaxBin //'`) need a one-line fix.
+- **Progress output goes to stderr**, not stdout. The original writes
+  to both stdout and the log file. Pipelines capturing stdout will see
+  less output but this shouldn't affect behavior.
+- **Exit code**: `1` on error (the original uses `-1` / 255 for some
+  errors). Pipelines checking for non-zero should be unaffected.
+- **No temp files next to input**: the original writes decompressed
+  contigs and other temp files next to the input file, which fails on
+  read-only filesystems. We write temp files relative to the output
+  prefix instead.
+
+### Missing output files
+
+- Per-bin marker tarball (`marker_of_each_bin.tar.gz`)
+- Multi-sample `.abundance` file
+- `-verbose` and `-plotmarker` are accepted but silently ignored
+
+### nf-core/mag
 
 The goal is a drop-in replacement for the MaxBin2 module in
-[nf-core/mag](https://nf-co.re/mag). Current status:
-
-**Works**: `-contig`, `-abund` (including `-abund2`, `-abund3` etc),
-`-reads`, `-thread`, `-out`, `-min_contig_length`, `-max_iteration`,
-`-prob_threshold`, `-markerset`. Output files: `*.fasta` bins,
-`.noclass`, `.tooshort`, `.summary`, `.marker`, `.log`.
-
-**Missing**: per-bin marker tarball (`marker_of_each_bin.tar.gz`),
-multi-sample `.abundance` file. Both are `optional: true` in the
-nf-core module and won't crash the pipeline.
-
-**Not tested in a real nf-core/mag run yet.** The equivalence tests
-compare output files against the original, but the tool has not been
-swapped into an actual nf-core pipeline run. If you try this, please
+[nf-core/mag](https://nf-co.re/mag). The missing output files above
+are `optional: true` in the nf-core module and won't crash the pipeline.
+**Not tested in a real nf-core/mag run yet.** If you try this, please
 report any issues.
 
 ## Versioning
