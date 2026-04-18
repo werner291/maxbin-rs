@@ -135,3 +135,18 @@ done
 echo "--- timing ---"
 printf "  original: %dm%02ds\n" $((ORIG_ELAPSED / 60)) $((ORIG_ELAPSED % 60))
 printf "  maxbin-rs: %dm%02ds\n" $((RUST_ELAPSED / 60)) $((RUST_ELAPSED % 60))
+
+# =========================================================================
+# Verdict: byte-identical bins?
+# =========================================================================
+echo ""
+ORIG_HASHES=$(for f in "$ORIG"/test.*.fasta; do [ -f "$f" ] && sha256sum "$f" | cut -d' ' -f1; done | sort)
+RUST_HASHES=$(for f in "$RUST"/test.*.fasta; do [ -f "$f" ] && sha256sum "$f" | cut -d' ' -f1; done | sort)
+
+if [ "$ORIG_HASHES" = "$RUST_HASHES" ] \
+  && diff -q "$ORIG/test.noclass" "$RUST/test.noclass" > /dev/null 2>&1; then
+  echo "PASS: all bins and noclass byte-identical"
+else
+  echo "FAIL: output differs"
+  exit 1
+fi

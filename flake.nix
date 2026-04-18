@@ -108,9 +108,9 @@
         # The Rust reimplementation — this is the main output of this project.
         maxbin-rs = pkgs.rustPlatform.buildRustPackage {
           pname = "maxbin-rs";
-          version = "0.1.0";
+          version = "0.1.3";
           src = ./.;
-          cargoHash = "sha256-JtKeMzunGOt6jQfSm9WGxXq2lRL61WCek+MzyxrlurI=";
+          cargoHash = "sha256-VWEJA/ZJoxXLjAXmC7zzD5JBIXZraPDWaQWGNoMwPsY=";
           # build.rs extracts C++ source from this tarball for FFI testing.
           MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
           # Wrap the binary so HMMER, Bowtie2, and FragGeneScan are on $PATH
@@ -133,9 +133,9 @@
         # Used for A/B benchmarking to test whether -flto closes the ~8x gap.
         maxbin-rs-lto = pkgs.rustPlatform.buildRustPackage {
           pname = "maxbin-rs-lto";
-          version = "0.1.0";
+          version = "0.1.3";
           src = ./.;
-          cargoHash = "sha256-JtKeMzunGOt6jQfSm9WGxXq2lRL61WCek+MzyxrlurI=";
+          cargoHash = "sha256-VWEJA/ZJoxXLjAXmC7zzD5JBIXZraPDWaQWGNoMwPsY=";
           MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
           MAXBIN2_CPP_LTO = "1";
           postInstall = ''
@@ -329,7 +329,7 @@
             test-cli-equivalence-minigut
             test-cli-equivalence-capes
             trace-cami-small
-            trace-cami-small-f64
+            trace-cami-small-ldouble
             trace-cami
             test-precision-divergence
             bench-components
@@ -402,9 +402,9 @@
           clippy = (
             rustPlatform.buildRustPackage {
               pname = "maxbin-rs-clippy";
-              version = "0.1.0";
+              version = "0.1.3";
               src = ./.;
-              cargoHash = "sha256-JtKeMzunGOt6jQfSm9WGxXq2lRL61WCek+MzyxrlurI=";
+              cargoHash = "sha256-VWEJA/ZJoxXLjAXmC7zzD5JBIXZraPDWaQWGNoMwPsY=";
               MAXBIN2_SRC_TARBALL = "${maxbin2-src-tarball}";
               buildPhase = "cargo clippy --tests -- -D warnings";
               installPhase = "touch $out";
@@ -421,6 +421,26 @@
           });
           inherit (tests) test-pipeline-stages test-cli test-cli-equivalence;
           inherit dockerTest;
+          # End-to-end recursive equivalence: f64-patched C++ vs Rust on
+          # downsampled CAMI (5000 contigs, depth-5 recursion). Asserts
+          # byte-identical bin output via the trace script's verdict.
+          recursive-equivalence =
+            pkgs.runCommand "check-recursive-equivalence"
+              {
+                nativeBuildInputs = [
+                  maxbin2-f64
+                  maxbin-rs
+                ];
+              }
+              ''
+                export MAXBIN_RS_DETERMINISTIC=1
+                export HOME=$(mktemp -d)
+                bash ${./tests/pipeline-trace.sh} \
+                  "${intermediates.cami-small}/contigs.fa" \
+                  "${intermediates.cami-small}/abund" \
+                  "${intermediates.cami-small}/hmmout"
+                touch $out
+              '';
         };
       }
     );

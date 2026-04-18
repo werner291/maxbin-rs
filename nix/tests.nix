@@ -127,17 +127,19 @@ let
   # trace of bin sizes across recursion depths. No pass/fail verdict.
   #
   # Factory: mkPipelineTrace { name, contigs, intermediates', maxbin2' }
-  # Uses trace-instrumented MaxBin2 by default (adds [trace] lines to stderr).
+  # Defaults to the f64-patched (double) MaxBin2 with trace logging — this is
+  # the canonical comparison since Rust f64 matches C++ double exactly.
+  # Use maxbin2-trace for the long-double comparison (inherent ~4 contig gap).
   #
-  #   nix run .#trace-cami-small       (downsampled CAMI, 5000 contigs)
-  #   nix run .#trace-cami-small-f64   (same, C++ patched to double)
-  #   nix run .#trace-cami             (full CAMI I High)
+  #   nix run .#trace-cami-small           (downsampled CAMI, C++ double)
+  #   nix run .#trace-cami-small-ldouble   (same, C++ long double)
+  #   nix run .#trace-cami                 (full CAMI I High, C++ double)
   mkPipelineTrace =
     {
       name,
       contigs,
       intermediates',
-      maxbin2' ? maxbin2-trace,
+      maxbin2' ? maxbin2-f64-trace,
     }:
     writeShellApplication {
       name = "trace-${name}";
@@ -222,11 +224,11 @@ in
     intermediates' = intermediates.cami-small;
   };
 
-  trace-cami-small-f64 = mkPipelineTrace {
-    name = "cami-small-f64";
+  trace-cami-small-ldouble = mkPipelineTrace {
+    name = "cami-small-ldouble";
     contigs = "${intermediates.cami-small}/contigs.fa";
     intermediates' = intermediates.cami-small;
-    maxbin2' = maxbin2-f64-trace;
+    maxbin2' = maxbin2-trace;
   };
 
   trace-cami = mkPipelineTrace {
