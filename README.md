@@ -203,7 +203,10 @@ These are intentional or unavoidable and should not affect correctness:
 
 - Per-bin marker tarball (`marker_of_each_bin.tar.gz`)
 - Multi-sample `.abundance` file
-- `-verbose` and `-plotmarker` are accepted but silently ignored
+- `--verbose` and `--plotmarker` are accepted but silently ignored
+- `--gene-caller prodigal` is accepted but **untested** — the code
+  path exists but prodigal is not bundled in the Nix flake and has
+  never been run end-to-end. Do not use in production.
 
 ### nf-core/mag
 
