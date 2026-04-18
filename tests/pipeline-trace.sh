@@ -20,7 +20,9 @@ ABUND="$2"
 HMMOUT="$3"
 
 WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+# Clean up on success; on failure, keep files for debugging
+cleanup() { if [ "${VERDICT:-PASS}" = "PASS" ]; then rm -rf "$WORK"; else echo "Work dir preserved: $WORK"; fi }
+trap cleanup EXIT
 
 export MAXBIN_RS_DETERMINISTIC=1
 
@@ -174,8 +176,8 @@ fi
 # Check noclass
 if ! diff -q "$ORIG/test.noclass" "$RUST/test.noclass" > /dev/null 2>&1; then
   echo "FAIL: noclass differs"
-  echo "  --- noclass headers diff ---"
-  diff <(grep '^>' "$ORIG/test.noclass" | sort) <(grep '^>' "$RUST/test.noclass" | sort) | head -20
+  echo "  file sizes: orig=$(wc -c < "$ORIG/test.noclass") rust=$(wc -c < "$RUST/test.noclass")"
+  diff <(grep '^>' "$ORIG/test.noclass") <(grep '^>' "$RUST/test.noclass") | head -20
   VERDICT="FAIL"
 fi
 
