@@ -46,13 +46,11 @@ pub fn parse<R: std::io::BufRead>(reader: R) -> Result<Vec<AbundanceRecord>, Str
 
         let header_part = &line[..sep_pos];
 
-        // KNOWN BUG (reproduced from original): AbundanceLoader.cpp:115 has
-        // `while (*c == '\t' && *c == ' ' && *c == ',' && *c == ';')` —
-        // all && instead of ||, so the loop body never executes. Only the
-        // single separator consumed by `*c = '\0'; c++` above is skipped.
-        // Multiple consecutive separators (e.g. "contig\t\t1.0") will misparse.
-        // Matches AbundanceLoader.cpp:108-118
-        let value_part = &line[sep_pos + 1..];
+        // The original has a bug here (AbundanceLoader.cpp:115):
+        // `while (*c == '\t' && *c == ' ' && *c == ',' && *c == ';')` uses
+        // && instead of ||, so multiple consecutive separators are never
+        // skipped. We fix this by trimming all leading separators/whitespace.
+        let value_part = line[sep_pos..].trim_start_matches(['\t', ' ', ',', ';']);
 
         if value_part.is_empty() {
             return Err(format!("no value after separator in line: {line}"));
@@ -61,14 +59,7 @@ pub fn parse<R: std::io::BufRead>(reader: R) -> Result<Vec<AbundanceRecord>, Str
         // Matches AbundanceLoader.cpp:164-168: trim trailing spaces/tabs from header
         let header = header_part.trim_end().to_string();
 
-        // Matches AbundanceLoader.cpp:125: atof(c).
-        // atof skips leading whitespace before parsing the number, while Rust's
-        // f64::parse does not. We trim to match atof behavior — this matters when
-        // the && bug leaves a second separator character in value_part (e.g. "\t308.5").
-        let abundance: f64 = value_part.trim_start().parse().unwrap_or({
-            // atof in C returns 0.0 for unparseable strings
-            0.0
-        });
+        let abundance: f64 = value_part.parse().unwrap_or(0.0);
 
         // Matches AbundanceLoader.cpp:173-176: clamp to VERY_SMALL_NUM
         let abundance = if abundance < VERY_SMALL_NUM {
@@ -149,16 +140,17 @@ mod tests {
     }
 
     #[test]
-    fn bug_multiple_separators_not_skipped() {
-        // Reproducing the && bug: "c1\t\t1.0" — only the first \t is consumed
-        // as the separator, leaving "\t1.0" as the value string. C's atof("\t1.0")
-        // skips leading whitespace and returns 1.0. We match this with trim_start().
-        let input = b"c1\t\t1.0\n";
+    fn multiple_separators_skipped() {
+        // The original has a bug where multiple consecutive separators are
+        // not skipped (&&  instead of ||). We fix this — multiple tabs,
+        // spaces, etc. between header and value are handled correctly.
+        let input = b"c1\t\t1.0\nc2\t  \t2.5\n";
         let records = parse(Cursor::new(input)).unwrap();
 
         assert_eq!(records[0].header, "c1");
-        // atof skips the leading \t in "\t1.0" and parses 1.0
         assert_eq!(records[0].abundance, 1.0);
+        assert_eq!(records[1].header, "c2");
+        assert_eq!(records[1].abundance, 2.5);
     }
 
     #[test]
