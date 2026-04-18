@@ -36,8 +36,8 @@
     };
   };
 
-  # `outputs` defines what this flake produces. The `eachDefaultSystem` call
-  # generates packages for Linux and macOS automatically.
+  # `outputs` defines what this flake produces. Currently x86_64-linux only;
+  # add more systems to the list below when they are tested.
   outputs =
     {
       self,
@@ -45,7 +45,7 @@
       flake-utils,
       rust-overlay,
     }:
-    flake-utils.lib.eachDefaultSystem (
+    flake-utils.lib.eachSystem [ "x86_64-linux" ] (
       system:
       let
         overlays = [ (import rust-overlay) ];
