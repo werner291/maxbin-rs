@@ -300,10 +300,10 @@ fn e_step_for_contig(
     // Normalize and find best bin
     let mut max = 0.0f64;
     let mut best_bin: i32 = -1;
-    for j in 0..seed_num {
-        probs[j] /= sum;
-        if max < probs[j] {
-            max = probs[j];
+    for (j, p) in probs.iter_mut().enumerate() {
+        *p /= sum;
+        if max < *p {
+            max = *p;
             best_bin = j as i32;
         }
     }
