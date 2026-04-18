@@ -65,8 +65,10 @@ maxbin-rs --contig contigs.fa --abund depth.txt --out result
 
 The `--faa` flag was inspired by
 [maxbin2_custom](https://github.com/mruehlemann/maxbin2_custom), which
-replaced FragGeneScan with Prodigal. We generalize this: any gene
-caller's protein FASTA output works.
+replaced FragGeneScan with Prodigal. In principle, any gene caller that
+produces a protein FASTA should work — HMMER doesn't care where the
+sequences came from. In practice, only FragGeneScan output has been
+tested end-to-end.
 
 **Note:** the full pipeline shells out to HMMER, Bowtie2, and
 FragGeneScan at runtime. The Nix package bundles these automatically.
