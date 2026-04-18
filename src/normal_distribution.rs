@@ -91,11 +91,11 @@ mod tests {
             let rust_p = rust_nd.prob(input);
             let cpp_p = cpp_nd.prob(input);
 
-            let diff = (rust_p - cpp_p).abs();
-            assert!(
-                diff < 1e-15,
-                "NormalDist mismatch for mean={mean}, std={std}, input={input}: \
-                 rust={rust_p} cpp={cpp_p} diff={diff}"
+            assert_eq!(
+                rust_p.to_bits(),
+                cpp_p.to_bits(),
+                "NormalDist not bit-identical for mean={mean}, std={std}, input={input}: \
+                 rust={rust_p:e} cpp={cpp_p:e}"
             );
         }
     }

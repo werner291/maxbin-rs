@@ -212,10 +212,10 @@ mod tests {
             let rust_d = euc_dist_seq(&ctx, seq1.as_bytes(), seq2.as_bytes());
             let cpp_d = cpp.get_dist_seq(seq1, seq2);
 
-            let diff = (rust_d - cpp_d).abs();
-            assert!(
-                diff < 1e-12,
-                "EucDist seq mismatch for '{seq1}' vs '{seq2}': rust={rust_d} cpp={cpp_d}"
+            assert_eq!(
+                rust_d.to_bits(),
+                cpp_d.to_bits(),
+                "EucDist seq not bit-identical for '{seq1}' vs '{seq2}': rust={rust_d:e} cpp={cpp_d:e}"
             );
         }
     }
@@ -242,10 +242,10 @@ mod tests {
                 let rust_d = euc_dist_profiles(&profiles[i], &profiles[j]);
                 let cpp_d = cpp.get_dist_profile(&profiles[i], &profiles[j]);
 
-                let diff = (rust_d - cpp_d).abs();
-                assert!(
-                    diff < 1e-12,
-                    "EucDist profile mismatch: rust={rust_d} cpp={cpp_d}"
+                assert_eq!(
+                    rust_d.to_bits(),
+                    cpp_d.to_bits(),
+                    "EucDist profile not bit-identical: rust={rust_d:e} cpp={cpp_d:e}"
                 );
             }
         }

@@ -172,10 +172,10 @@ mod tests {
 
             assert_eq!(rust_profile.len(), cpp_profile.len());
             for i in 0..rust_profile.len() {
-                let diff = (rust_profile[i] - cpp_profile[i]).abs();
-                assert!(
-                    diff < 1e-12,
-                    "profile mismatch at index {i} for seq '{seq}': rust={} cpp={}",
+                assert_eq!(
+                    rust_profile[i].to_bits(),
+                    cpp_profile[i].to_bits(),
+                    "profile not bit-identical at index {i} for seq '{seq}': rust={:e} cpp={:e}",
                     rust_profile[i],
                     cpp_profile[i]
                 );
