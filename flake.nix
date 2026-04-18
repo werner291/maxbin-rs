@@ -128,6 +128,17 @@
           patches = (old.patches or [ ]) ++ [ tracePatch ];
         });
 
+        # EM-only binary — no external tool dependencies.
+        # Supports `em`, `filter`, and `seeds` subcommands only.
+        # Pipeline mode errors out telling the user to use the full package.
+        maxbin-rs-em = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            pname = "maxbin-rs-em";
+          }
+        );
+
         # The Rust reimplementation — this is the main output of this project.
         maxbin-rs = craneLib.buildPackage (
           commonArgs

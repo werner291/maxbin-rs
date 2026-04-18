@@ -39,7 +39,13 @@ pub fn run_fraggenescan(contig: &Path, out_prefix: &str, threads: usize) -> Resu
         .arg("-train=complete")
         .arg(format!("-thread={threads}"))
         .status()
-        .map_err(|e| format!("Failed to run FragGeneScan: {e}"))?;
+        .map_err(|e| {
+            format!(
+                "Failed to run FragGeneScan: {e}\n\
+            Hint: use --faa to skip gene calling, or install the full package \
+            (nix run github:werner291/maxbin-rs) which bundles all dependencies."
+            )
+        })?;
 
     if !status.success() {
         return Err("FragGeneScan failed. Check that run_FragGeneScan.pl is on PATH.".into());
@@ -84,9 +90,13 @@ pub fn run_hmmsearch(
         .arg(faa_file)
         .stdout(std::process::Stdio::null());
 
-    let output = cmd
-        .output()
-        .map_err(|e| format!("Failed to run hmmsearch: {e}"))?;
+    let output = cmd.output().map_err(|e| {
+        format!(
+            "Failed to run hmmsearch: {e}\n\
+            Hint: use --hmmout to skip HMMER, or install the full package \
+            (nix run github:werner291/maxbin-rs) which bundles all dependencies."
+        )
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
