@@ -8,9 +8,7 @@
 /// 5. Recursive binning: seed → EM → re-seed output bins → repeat (up to 5 levels)
 /// 6. Merge noclass, filter small bins, sort by abundance
 /// 7. Write output files
-use crate::cli::{
-    CppEmArgs, EmArgs, FilterArgs, GeneCaller, PipelineArgs, SamToAbundArgs, SeedsArgs,
-};
+use crate::cli::{CppEmArgs, EmArgs, FilterArgs, PipelineArgs, SamToAbundArgs, SeedsArgs};
 use crate::fasta;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -439,20 +437,15 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         eprintln!("  {} hits", hmm_hit_count);
         (user_hmmout.clone(), None)
     } else {
-        // Step 3: Gene calling
-        let faa = match cli.gene_caller {
-            GeneCaller::Fraggenescan => {
-                eprintln!("Running FragGeneScan...");
-                let prefix = filtered_contigs.display().to_string();
-                crate::external::run_fraggenescan(&filtered_contigs, &prefix, cli.thread)?;
-                PathBuf::from(format!("{prefix}.frag.faa"))
-            }
-            GeneCaller::Prodigal => {
-                eprintln!("Running Prodigal...");
-                let prefix = filtered_contigs.display().to_string();
-                crate::external::run_prodigal(&filtered_contigs, &prefix)?;
-                PathBuf::from(format!("{prefix}.faa"))
-            }
+        // Step 3: Gene calling — use provided .faa or run FragGeneScan
+        let faa = if let Some(ref user_faa) = cli.faa {
+            eprintln!("Using pre-computed protein FASTA: {}", user_faa.display());
+            user_faa.clone()
+        } else {
+            eprintln!("Running FragGeneScan...");
+            let prefix = filtered_contigs.display().to_string();
+            crate::external::run_fraggenescan(&filtered_contigs, &prefix, cli.thread)?;
+            PathBuf::from(format!("{prefix}.frag.faa"))
         };
 
         // Step 4: HMMER marker gene search

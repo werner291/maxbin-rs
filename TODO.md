@@ -58,10 +58,6 @@ lack of ongoing maintenance rather than poor original engineering.
 - `-reassembly` not implemented (IDBA-UD reassembly per bin)
 - Reads format detection: extension-only, no bzip2
 - Incomplete intermediate cleanup (SAM, `.bt2` index files)
-- `--gene-caller prodigal` code path exists but is untested — prodigal
-  is not in the Nix flake, has never been run end-to-end. Needs:
-  bundling prodigal in flake, equivalence test against FragGeneScan
-  path, and verification that HMMER hits from prodigal output match.
 
 ### Code quality
 

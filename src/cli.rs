@@ -14,24 +14,9 @@
 ///   maxbin-rs pipeline     — run the full pipeline (default when no subcommand given)
 use std::path::PathBuf;
 
-use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Args, Parser, Subcommand};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-#[derive(Debug, Clone, Copy, PartialEq, ValueEnum)]
-pub enum GeneCaller {
-    Fraggenescan,
-    Prodigal,
-}
-
-impl std::fmt::Display for GeneCaller {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Fraggenescan => write!(f, "fraggenescan"),
-            Self::Prodigal => write!(f, "prodigal"),
-        }
-    }
-}
 
 #[derive(Parser)]
 #[command(
@@ -146,8 +131,10 @@ pub struct PipelineArgs {
     pub prob_threshold: Option<f64>,
     #[arg(long, default_value_t = 107)]
     pub markerset: u32,
-    #[arg(long, default_value_t = GeneCaller::Fraggenescan)]
-    pub gene_caller: GeneCaller,
+    /// Pre-computed protein FASTA (e.g. from Prodigal) — skips gene calling.
+    /// HMMER will run on this file instead of calling FragGeneScan.
+    #[arg(long)]
+    pub faa: Option<PathBuf>,
     #[arg(long)]
     pub plotmarker: bool,
     #[arg(long)]

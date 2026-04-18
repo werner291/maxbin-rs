@@ -52,33 +52,6 @@ pub fn run_fraggenescan(contig: &Path, out_prefix: &str, threads: usize) -> Resu
     Ok(())
 }
 
-/// Run Prodigal on a contig file to predict genes.
-/// Produces {out_prefix}.faa (amino acid FASTA).
-///
-/// NOTE: No direct Perl equivalent — the original only supports FragGeneScan.
-/// Prodigal support is inspired by mruehlemann/maxbin2_custom fork.
-pub fn run_prodigal(contig: &Path, out_prefix: &str) -> Result<(), String> {
-    let faa = format!("{out_prefix}.faa");
-    let status = Command::new("prodigal")
-        .args(["-a", &faa])
-        .args(["-i", &contig.display().to_string()])
-        .args(["-m", "-o", &format!("{out_prefix}.prodigal.tmp")])
-        .args(["-p", "meta", "-q"])
-        .status()
-        .map_err(|e| format!("Failed to run Prodigal: {e}"))?;
-
-    if !status.success() {
-        return Err("Prodigal failed. Check that prodigal is on PATH.".into());
-    }
-
-    if !Path::new(&faa).exists() {
-        return Err(format!("Prodigal produced no output ({faa} not found)"));
-    }
-    // Clean up temp file
-    let _ = std::fs::remove_file(format!("{out_prefix}.prodigal.tmp"));
-    Ok(())
-}
-
 /// Run HMMER hmmsearch against marker gene HMM profiles.
 /// Produces {out_file} (hmmsearch table output).
 ///
