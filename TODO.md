@@ -99,31 +99,13 @@ lack of ongoing maintenance rather than poor original engineering.
 
 ### Pipeline equivalence gaps (found via CLI surface comparison)
 
-Critical — these affect bin output and must be fixed before claiming equivalence:
+Remaining:
 
-- [ ] **Recursive binning** — the original re-bins each output bin up to 5 levels deep
-  (`$RECURSION_MAX = 5` in run_MaxBin.pl:467-579). We run a single EM pass.
-  On simple datasets the results match, but on real metagenomes with mixed genomes
-  the original will produce many more bins via recursive splitting. This is the core
-  of MaxBin2's bin refinement strategy.
-- [ ] **MIN_BIN_SIZE filtering** — original drops bins < 100kbp to noclass
-  (run_MaxBin.pl:606-626). We keep all bins regardless of size.
-- [ ] **Bin sorting by abundance** — original sorts bins by descending abundance
-  and renumbers them (run_MaxBin.pl:628-663). We number sequentially.
-- [x] **Recursive binning** — implemented (depth 5, MIN_BIN_SIZE, abundance sorting)
-- [x] **MIN_BIN_SIZE filtering** — implemented (100kbp threshold)
-- [x] **Bin sorting by abundance** — implemented
-- [x] **hmmsearch flags for markerset=40** — fixed: now uses `-E 1e-3` instead of `--cut_tc`
-- [x] **Seed index ordering** — fixed: iterate FASTA order, not seed file order
-  (matches EManager.cpp:380-412)
-- [ ] **Known precision divergence** — `long double` (80-bit) in C++ vs `f64` (64-bit)
-  in Rust. On a 14-contig sub-bin at recursion depth 4, C++ classifies 0 contigs,
-  Rust classifies 13. Traced and documented with FFI test
-  (`tests/emanager_equivalence.rs::emanager_precision_divergence_cami_depth4`).
-  Affects 9/5000 contigs on downsampled CAMI I High. Cannot fix without 80-bit
-  floats in Rust (not natively supported). The C++ patched to `double` also
-  diverges differently — this is inherent to the algorithm's sensitivity to
-  precision on marginal inputs.
+- [ ] **`long double` vs `f64` precision gap** — the original uses 80-bit
+  `long double` on x86-64 Linux (but 64-bit on macOS/Windows/ARM). This
+  is an inherent ~2.5 decimal digit precision difference that cannot be
+  closed without 80-bit floats in Rust. Affects a small number of contigs
+  at decision boundaries where probability ≈ 0.5 ± 10⁻¹⁶.
 - [ ] **Summary "Bins without sequences" counter bug** — C++ reuses loop variable `j`
   in write_result (EManager.cpp:1424-1438), causing wrong numbering when ab_num > 1.
   Our Rust uses a separate counter and numbers correctly. Not reproduced — unlikely
@@ -164,8 +146,6 @@ Minor:
 
 ### Testing
 
-- [x] Pipeline stage tests are now sandboxed Nix derivations (`runCommand`).
-  ~~Could silently pick up files from the host.~~
 
 ## Plan
 
