@@ -480,6 +480,61 @@ the EM converges to 0.5 ± 1e-16 and classification hinges on the
 susceptible to similar platform-dependent divergence on degenerate
 inputs.
 
+<!--
+TODO: rewrite the above section with the following updated findings.
+
+### Float precision: what we actually found
+
+When we controlled for float width — patching the C++ to use `double`
+(64-bit) instead of `long double` (80-bit) — the output still diverged.
+The cause turned out to be float multiplication ordering in the EM
+M-step: the C++ computes `abundance * length * probability` (left to
+right), while the Rust had `abundance * (length * probability)` (pre-
+computing a `weight` variable). IEEE 754 multiplication is not
+associative; on representative inputs this produces a 1 ULP difference
+per accumulation step.
+
+Over 6 EM iterations, the 1 ULP difference is invisible. At iteration
+7, seed abundances (updated from the M-step accumulation) diverge by
+~1 ULP. This propagates through subsequent iterations: by iteration 15,
+classification probabilities for marginal contigs sit at 0.5 ± 1 ULP.
+The decision threshold is 0.5. One implementation rounds up, the other
+rounds down. The classifier has zero confidence in either case.
+
+After matching the multiplication order to the C++ evaluation sequence,
+the Rust and C++ `double` implementations produce **bit-for-bit
+identical output** across all 19 EM iterations on the previously-
+divergent fixture. Every seq_prob value, every bin assignment, every bit.
+
+The precision story is now:
+
+- **Same float width (double/f64): bit-for-bit identical output.**
+  Verified on component-level fixtures and on full recursive pipelines.
+
+- **Different float width (long double vs f64): diverges only at
+  decision boundaries where probability ≈ threshold ± ε, where
+  ε ≈ 10⁻¹⁶.** On the full CAMI I High benchmark (42,038 contigs),
+  this affects ~4 contigs and results in 252 vs 253 bins — a difference
+  of <0.1% of contigs. The precision gap between 80-bit `long double`
+  (64-bit mantissa, ~18.4 decimal digits) and 64-bit `double`/`f64`
+  (52-bit mantissa, ~15.9 decimal digits) is ~2.5 decimal digits.
+  All probabilities agree to 15 significant figures.
+
+- **Performance: ~8x faster** (44 min vs 5m44s on CAMI I High).
+
+Since `long double` is 64-bit on macOS, Windows, and ARM, the original
+MaxBin2 would exhibit the same `double`-precision behavior on those
+platforms. Our Rust implementation matches that behavior exactly.
+
+The rewrites.bio manifesto calls for "byte-for-byte identical output
+files" for deterministic tools, with "results within acceptable
+numerical precision (defined by scientists, not convenience)" for
+non-deterministic calculations. Our claim: at the same float width, the
+output is byte-identical. At different float widths, the divergence is
+precisely characterized (ε ≈ 10⁻¹⁶ at decision boundaries) and affects
+only contigs where the classifier has no confidence.
+-->
+
 ### Working with LLMs
 
 The LLM was productive at mechanical translation (C++ or Perl to
