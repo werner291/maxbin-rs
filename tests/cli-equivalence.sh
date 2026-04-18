@@ -80,9 +80,12 @@ echo "=== CLI-Level Equivalence Tests ==="
 echo ""
 
 # =========================================================================
-# 1. Full pipeline with pre-computed abundance (default settings)
+# 1. Full pipeline with pre-computed abundance
 # =========================================================================
-echo "--- 1. Full pipeline, default settings, -abund ---"
+# Both tools run with -prob_threshold 0.9 (the documented default).
+# The original's code defaults to 0.5 but we use 0.9; passing it
+# explicitly ensures both tools use the same threshold.
+echo "--- 1. Full pipeline, -prob_threshold 0.9, -abund ---"
 
 ORIG="$WORK/1_orig"
 RUST="$WORK/1_rust"
@@ -95,6 +98,7 @@ cp "$CONTIGS" "$WORK/contigs_input.fa.gz"
 echo "  Running original MaxBin2..."
 run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
   -abund "$ABUND" -out "$ORIG/test" -thread 1 \
+  -prob_threshold 0.9 \
   > "$ORIG/stdout.log" 2>&1 || true
 
 echo "  Running maxbin-rs..."
@@ -136,7 +140,7 @@ mkdir -p "$ORIG" "$RUST"
 echo "  Running original MaxBin2..."
 run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
   -abund "$ABUND" -out "$ORIG/test" -thread 1 \
-  -min_contig_length 500 \
+  -min_contig_length 500 -prob_threshold 0.9 \
   > "$ORIG/stdout.log" 2>&1 || true
 
 echo "  Running maxbin-rs..."
@@ -150,9 +154,9 @@ compare_bins "$ORIG" "$RUST" "2.1 bins (min_contig_length=500)"
 echo ""
 
 # =========================================================================
-# 3. prob_threshold=0.9
+# 3. prob_threshold=0.5 (original's code default, backward compat)
 # =========================================================================
-echo "--- 3. prob_threshold=0.9 ---"
+echo "--- 3. prob_threshold=0.5 (original's buggy default) ---"
 
 ORIG="$WORK/3_orig"
 RUST="$WORK/3_rust"
@@ -161,19 +165,19 @@ mkdir -p "$ORIG" "$RUST"
 echo "  Running original MaxBin2..."
 run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
   -abund "$ABUND" -out "$ORIG/test" -thread 1 \
-  -prob_threshold 0.9 \
+  -prob_threshold 0.5 \
   > "$ORIG/stdout.log" 2>&1 || true
 
 echo "  Running maxbin-rs..."
 maxbin-rs -contig "$CONTIGS" \
   -abund "$ABUND" -out "$RUST/test" -thread 1 \
-  -prob_threshold 0.9 \
+  -prob_threshold 0.5 \
   2> "$RUST/stderr.log" || true
 
-compare_bins "$ORIG" "$RUST" "3.1 bins (prob_threshold=0.9)"
+compare_bins "$ORIG" "$RUST" "3.1 bins (prob_threshold=0.5)"
 
 if [ -f "$ORIG/test.noclass" ] && [ -f "$RUST/test.noclass" ]; then
-  compare_files "$ORIG/test.noclass" "$RUST/test.noclass" "3.2 noclass (prob_threshold=0.9)"
+  compare_files "$ORIG/test.noclass" "$RUST/test.noclass" "3.2 noclass (prob_threshold=0.5)"
 fi
 
 echo ""
@@ -190,7 +194,7 @@ mkdir -p "$ORIG" "$RUST"
 echo "  Running original MaxBin2..."
 run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
   -abund "$ABUND" -out "$ORIG/test" -thread 1 \
-  -markerset 40 \
+  -markerset 40 -prob_threshold 0.9 \
   > "$ORIG/stdout.log" 2>&1 || true
 
 echo "  Running maxbin-rs..."
@@ -220,7 +224,7 @@ if [ -n "${READS1:-}" ]; then
   echo "  Running original MaxBin2..."
   run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
     -reads "$WORK/reads1_input.fastq.gz" \
-    -out "$ORIG/test" -thread 1 \
+    -out "$ORIG/test" -thread 1 -prob_threshold 0.9 \
     > "$ORIG/stdout.log" 2>&1 || true
 
   echo "  Running maxbin-rs..."
@@ -248,7 +252,7 @@ mkdir -p "$ORIG" "$RUST"
 echo "  Running original MaxBin2..."
 run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
   -abund "$ABUND" -out "$ORIG/test" -thread 1 \
-  -max_iteration 1 \
+  -max_iteration 1 -prob_threshold 0.9 \
   > "$ORIG/stdout.log" 2>&1 || true
 
 echo "  Running maxbin-rs..."

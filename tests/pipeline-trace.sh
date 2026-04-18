@@ -85,7 +85,7 @@ cp "$HMMOUT" "$ORIG/test.contig.tmp.hmmout"
 touch "$ORIG/test.contig.tmp.hmmout.FINISH"
 ORIG_START=$SECONDS
 run_MaxBin.pl -contig "$ORIG/contigs.fa" \
-  -abund "$ABUND" -out "$ORIG/test" -thread 1 \
+  -abund "$ABUND" -out "$ORIG/test" -thread 1 -prob_threshold 0.9 \
   2>&1 | grep --line-buffered -E '^\[trace\]|MaxBin 2\.|^Iteration' | grep --line-buffered -v 'skipped (no seeds)' | sed -u 's/^/  orig│ /'
 ORIG_ELAPSED=$((SECONDS - ORIG_START))
 echo ""
@@ -140,13 +140,47 @@ printf "  maxbin-rs: %dm%02ds\n" $((RUST_ELAPSED / 60)) $((RUST_ELAPSED % 60))
 # Verdict: byte-identical bins?
 # =========================================================================
 echo ""
+VERDICT="PASS"
+
+# Check each bin by sorted hash (bin numbering may differ)
 ORIG_HASHES=$(for f in "$ORIG"/test.*.fasta; do [ -f "$f" ] && sha256sum "$f" | cut -d' ' -f1; done | sort)
 RUST_HASHES=$(for f in "$RUST"/test.*.fasta; do [ -f "$f" ] && sha256sum "$f" | cut -d' ' -f1; done | sort)
 
-if [ "$ORIG_HASHES" = "$RUST_HASHES" ] \
-  && diff -q "$ORIG/test.noclass" "$RUST/test.noclass" > /dev/null 2>&1; then
+if [ "$ORIG_HASHES" != "$RUST_HASHES" ]; then
+  echo "FAIL: bin hashes differ"
+  # Find which bins don't have a matching hash on the other side
+  ORIG_ONLY=$(comm -23 <(echo "$ORIG_HASHES") <(echo "$RUST_HASHES"))
+  RUST_ONLY=$(comm -13 <(echo "$ORIG_HASHES") <(echo "$RUST_HASHES"))
+  N_ORIG=$(echo "$ORIG_ONLY" | grep -c .)
+  N_RUST=$(echo "$RUST_ONLY" | grep -c .)
+  echo "  $N_ORIG bins unique to original, $N_RUST bins unique to rust"
+
+  # For each unmatched original bin, find which rust bin has the closest
+  # contig count and diff the headers
+  for f in "$ORIG"/test.*.fasta; do
+    h=$(sha256sum "$f" | cut -d' ' -f1)
+    if echo "$RUST_ONLY" | grep -q . && ! echo "$RUST_HASHES" | grep -q "$h"; then
+      bname=$(basename "$f")
+      rf="$RUST/$bname"
+      if [ -f "$rf" ]; then
+        echo "  --- $bname headers diff ---"
+        diff <(grep '^>' "$f" | sort) <(grep '^>' "$rf" | sort) | head -10
+      fi
+    fi
+  done
+  VERDICT="FAIL"
+fi
+
+# Check noclass
+if ! diff -q "$ORIG/test.noclass" "$RUST/test.noclass" > /dev/null 2>&1; then
+  echo "FAIL: noclass differs"
+  echo "  --- noclass headers diff ---"
+  diff <(grep '^>' "$ORIG/test.noclass" | sort) <(grep '^>' "$RUST/test.noclass" | sort) | head -20
+  VERDICT="FAIL"
+fi
+
+if [ "$VERDICT" = "PASS" ]; then
   echo "PASS: all bins and noclass byte-identical"
 else
-  echo "FAIL: output differs"
   exit 1
 fi

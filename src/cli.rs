@@ -120,9 +120,10 @@ pub struct EmArgs {
     pub thread: usize,
     #[arg(long, default_value_t = 50)]
     pub max_iteration: usize,
-    /// Probability threshold for EM final classification.
-    /// NOTE: the original help text claims 0.9 but the code uses 0.5.
-    /// We reproduce the code behavior (0.5) for equivalence.
+    /// Probability threshold for EM final classification (default: 0.9).
+    /// Note: the original code defaults to 0.5 but the help text says 0.9.
+    /// We use 0.9 (the documented value). Use -prob_threshold 0.5 for
+    /// bug-for-bug compatibility with the original.
     #[arg(long)]
     pub prob_threshold: Option<f64>,
     #[arg(long, default_value_t = 1000)]
@@ -151,9 +152,10 @@ pub struct PipelineArgs {
     pub max_iteration: usize,
     #[arg(long, default_value_t = 1)]
     pub thread: usize,
-    /// Probability threshold for EM final classification.
-    /// NOTE: the original help text claims 0.9 but the code uses 0.5.
-    /// We reproduce the code behavior (0.5) for equivalence.
+    /// Probability threshold for EM final classification (default: 0.9).
+    /// Note: the original code defaults to 0.5 but the help text says 0.9.
+    /// We use 0.9 (the documented value). Use -prob_threshold 0.5 for
+    /// bug-for-bug compatibility with the original.
     #[arg(long)]
     pub prob_threshold: Option<f64>,
     #[arg(long, default_value_t = 107)]
@@ -315,10 +317,14 @@ pub fn parse_from(args: &[String]) -> Command {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Effective prob_threshold: defaults to 0.5 if unset or negative
-/// (matches EManager.cpp:155, NOT the help text which says 0.9).
+/// Effective prob_threshold: defaults to 0.9 if unset or negative.
+///
+/// v0.2 BREAKING CHANGE: the original code defaults to 0.5
+/// (EManager.cpp:155) but the help text and paper say 0.9. We follow
+/// the documented behavior. This changes bin assignments on any run
+/// that doesn't explicitly set -prob_threshold.
 pub fn effective_prob_threshold(raw: Option<f64>) -> f64 {
-    raw.filter(|&v| v >= 0.0).unwrap_or(0.5)
+    raw.filter(|&v| v >= 0.0).unwrap_or(0.9)
 }
 
 /// Merge direct file paths with lines from an optional list file.
@@ -508,7 +514,7 @@ mod tests {
         else {
             panic!("Expected Pipeline")
         };
-        assert_eq!(cli.prob_threshold(), 0.5);
+        assert_eq!(cli.prob_threshold(), 0.9);
     }
 
     #[test]
@@ -626,7 +632,7 @@ mod tests {
         ])) else {
             panic!("Expected Em")
         };
-        assert_eq!(a.prob_threshold(), 0.5);
+        assert_eq!(a.prob_threshold(), 0.9);
     }
 
     #[test]
