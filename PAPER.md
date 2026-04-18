@@ -37,14 +37,13 @@ Readers who consider either point disqualifying are welcome to stop here.
 I present a Rust reimplementation of MaxBin2, a widely-used metagenome
 binning tool. This case study touches on three topics: equivalence-first
 rewriting as a methodology, Nix-based reproducibility, and LLM-assisted
-development in practice. Intermediate pipeline stages are byte-identical
-for the EM core, within floating-point tolerance for abundance
-computations, and identical as sets for seed selection. End-to-end
-output matches on small datasets; on a 5000-contig subset of the
-CAMI I High metagenome benchmark, 9 contigs are classified differently
-due to float precision (`long double` vs `f64`) compounding through
-5 levels of recursive binning. Known bugs are reproduced
-intentionally.
+development in practice. At the same float width (`double`/`f64`), all pipeline stages and the
+full recursive EM produce bit-for-bit identical output. The only
+divergence is between the original's `long double` (80-bit, x86-64
+Linux only) and Rust's `f64` (64-bit): on the full CAMI I High
+benchmark (42,038 contigs), ~4 contigs are classified differently at a
+decision boundary where the classifier has no confidence (probability
+≈ 0.5 ± 10⁻¹⁶). Known bugs are reproduced intentionally.
 
 I extend the rewrites.bio approach by introducing Nix as a packaging and
 reproducibility layer. The original MaxBin2 can be installed via Conda,
@@ -254,8 +253,8 @@ tools, so their output is identical). Each stage is then tested by feeding the
 original's intermediate output to the Rust reimplementation and checking
 that it produces matching results. The pipeline stage test
 ([tests/pipeline-stages.sh](tests/pipeline-stages.sh)) compares
-at each interface: byte-exact for text files, within floating-point
-tolerance for abundance values, and as unordered sets for bin contents.
+at each interface: byte-exact for text files and abundance values,
+and as unordered sets for bin contents.
 (See the script header for detailed documentation and example output.)
 
 Adding a new dataset requires one function call in the Nix configuration
@@ -323,7 +322,7 @@ The pipeline stage tests verify:
 | Stage | What is compared | Result |
 |---|---|---|
 | Contig filtering | tooshort reject file | Byte-identical |
-| SAM → abundance | Per-contig depth values | Within tolerance (max diff < 1e-15) |
+| SAM → abundance | Per-contig depth values | Byte-identical |
 | HMM → seeds | Seed contig names | Identical as sets |
 | EM binning | Bin FASTA files, noclass, tooshort | Byte-identical |
 
@@ -387,9 +386,9 @@ on the Rust side):
 | Rust with `f64` | 231s | <1s | <1s | ~3.9 min |
 
 The C++ uses `long double` (80-bit x87 on this platform) while Rust
-uses `f64` (64-bit IEEE 754). On a single EM pass, bin assignments are
-identical. The precision difference manifests through recursive binning
-(see [Discussion](#nondeterminism-and-float-precision)).
+uses `f64` (64-bit IEEE 754). At the same float width, output is
+bit-identical; the `long double`-vs-`f64` difference affects ~4 contigs
+on CAMI I High (see [Discussion](#nondeterminism-and-float-precision)).
 
 I did not expect an ~8x gap and spent considerable effort trying to
 close it from the C++ side. I stripped all `sprintf` and logging calls
@@ -468,72 +467,37 @@ ultimately abandoned — no built-in equivalent exists, and the effort
 was disproportionate. The equivalence tests accept floating-point
 tolerance instead.
 
-A separate issue: the original C++ uses `long double` (80-bit on
-x86-64 Linux, 64-bit on macOS/Windows) for EM probability
-computations. Rust uses `f64` (64-bit everywhere). On a single EM
-pass, bin assignments are identical. Through 5 levels of recursive
-binning, the precision difference affects 9 out of 5000 contigs on
-downsampled CAMI I High — all from a single degenerate sub-bin where
-the EM converges to 0.5 ± 1e-16 and classification hinges on the
-16th decimal digit (`nix build .#test-precision-divergence`). Since
-`long double` is 64-bit on macOS and Windows, the original is likely
-susceptible to similar platform-dependent divergence on degenerate
-inputs.
+Floating-point equivalence across language boundaries is harder than it
+looks. The original C++ uses `long double` (80-bit extended precision on
+x86-64 Linux, but 64-bit on macOS, Windows, and ARM — the original is
+not even consistent with itself across platforms). Rust has no `long
+double`; it uses `f64` (64-bit IEEE 754). Through recursive binning,
+this precision difference produced different bin assignments on a small
+number of contigs.
 
-<!--
-TODO: rewrite the above section with the following updated findings.
+To isolate the cause, I patched the C++ to use `double` instead of
+`long double` — matching the Rust float width exactly. This changes the original's behavior, but since `long double` is
+already 64-bit on macOS, Windows, and ARM, the patched version is
+equivalent to how the original behaves on those platforms. Even
+with matching float widths, the output still diverged. Per-iteration hex
+dumps of all EM state showed the first difference at iteration 7: every
+individual math function (`lgamma`, `exp`, `sqrt`, normal distribution
+PDF) was bit-identical between C++ and Rust, but the M-step
+accumulation was not. The cause: IEEE 754 multiplication is not
+associative, and the C++ evaluates `abundance * length * probability`
+left-to-right while the Rust code had pre-computed
+`weight = length * probability` and then multiplied
+`abundance * weight`. The 1 ULP difference compounded over iterations,
+eventually flipping a threshold decision at probability ≈ 0.5.
 
-### Float precision: what we actually found
+After matching the evaluation order, all output is bit-for-bit
+identical at the same float width — verified across all EM iterations
+and all 10 component-level FFI equivalence tests.
 
-When we controlled for float width — patching the C++ to use `double`
-(64-bit) instead of `long double` (80-bit) — the output still diverged.
-The cause turned out to be float multiplication ordering in the EM
-M-step: the C++ computes `abundance * length * probability` (left to
-right), while the Rust had `abundance * (length * probability)` (pre-
-computing a `weight` variable). IEEE 754 multiplication is not
-associative; on representative inputs this produces a 1 ULP difference
-per accumulation step.
-
-Over 6 EM iterations, the 1 ULP difference is invisible. At iteration
-7, seed abundances (updated from the M-step accumulation) diverge by
-~1 ULP. This propagates through subsequent iterations: by iteration 15,
-classification probabilities for marginal contigs sit at 0.5 ± 1 ULP.
-The decision threshold is 0.5. One implementation rounds up, the other
-rounds down. The classifier has zero confidence in either case.
-
-After matching the multiplication order to the C++ evaluation sequence,
-the Rust and C++ `double` implementations produce **bit-for-bit
-identical output** across all 19 EM iterations on the previously-
-divergent fixture. Every seq_prob value, every bin assignment, every bit.
-
-The precision story is now:
-
-- **Same float width (double/f64): bit-for-bit identical output.**
-  Verified on component-level fixtures and on full recursive pipelines.
-
-- **Different float width (long double vs f64): diverges only at
-  decision boundaries where probability ≈ threshold ± ε, where
-  ε ≈ 10⁻¹⁶.** On the full CAMI I High benchmark (42,038 contigs),
-  this affects ~4 contigs and results in 252 vs 253 bins — a difference
-  of <0.1% of contigs. The precision gap between 80-bit `long double`
-  (64-bit mantissa, ~18.4 decimal digits) and 64-bit `double`/`f64`
-  (52-bit mantissa, ~15.9 decimal digits) is ~2.5 decimal digits.
-  All probabilities agree to 15 significant figures.
-
-- **Performance: ~8x faster** (44 min vs 5m44s on CAMI I High).
-
-Since `long double` is 64-bit on macOS, Windows, and ARM, the original
-MaxBin2 would exhibit the same `double`-precision behavior on those
-platforms. Our Rust implementation matches that behavior exactly.
-
-The rewrites.bio manifesto calls for "byte-for-byte identical output
-files" for deterministic tools, with "results within acceptable
-numerical precision (defined by scientists, not convenience)" for
-non-deterministic calculations. Our claim: at the same float width, the
-output is byte-identical. At different float widths, the divergence is
-precisely characterized (ε ≈ 10⁻¹⁶ at decision boundaries) and affects
-only contigs where the classifier has no confidence.
--->
+The remaining divergence is `long double` (80-bit) vs `f64` (64-bit):
+a ~2.5 decimal digit precision gap. On CAMI I High (42,038 contigs)
+this affects ~4 contigs — cases where the classifier converges to
+0.5 ± 10⁻¹⁶ and has no confidence in either assignment.
 
 ### Working with LLMs
 
@@ -546,7 +510,29 @@ is a separate C++ binary called via FFI. LLMs will also agree that
 broken code works if presented confidently; fresh-context subagents
 (separate invocations that see only the code, not the conversation)
 helped catch this. Throughout, the LLM had to be repeatedly redirected
-away from "improving" the original rather than reproducing it.
+away from "improving" the original rather than reproducing it — the
+core [rewrites.bio](https://rewrites.bio) principle that a rewrite
+which changes output is a different tool.
+
+A subtler pattern: when investigating the float precision divergence,
+the LLM repeatedly suggested accepting the difference and moving on —
+framing it as an inherent `long double` vs `f64` gap, proposing
+tolerance-based tests, and characterizing the affected contigs as
+"meaningless edge cases." This was reasonable advice on the surface,
+but it would have left a multiplication-ordering discrepancy unresolved.
+The Rust code computed `abundance * (length * probability)` where the
+C++ evaluated `abundance * length * probability` left-to-right — both
+are mathematically equivalent and neither is wrong, but IEEE 754
+multiplication is not associative and the difference compounds over EM
+iterations. This is not a bug in either implementation; it is an
+incidental property of the original's source code that must be matched
+for bit-identical output. The root cause was only found by insisting on
+a bit-level investigation that the LLM initially framed as unnecessary.
+
+Whether this tendency to satisfice is a net positive (preventing rabbit
+holes) or a net negative (missing reproducibility requirements) likely
+depends on context; in equivalence work, the instinct to accept "close
+enough" is dangerous.
 
 The most significant failure: the original MaxBin2's Perl orchestration
 runs the EM algorithm *recursively* — each output bin is re-seeded from
@@ -560,11 +546,12 @@ discovered the next day when end-to-end CLI equivalence tests were added
 that run both tools on the same input and compare output. By that point
 I had already announced the tool on the nf-core/mag Slack channel.
 
-This is a structural weakness of LLM-assisted rewrites: the LLM excels
-at translating individual functions but can miss higher-level control
-flow that spans files (in this case, a Perl `while` loop that
-coordinates multiple calls to a C++ binary). Component tests verify
-each piece works; only integration tests verify the whole.
+In hindsight, the pre-processing stages (contig filtering, abundance
+parsing, seed selection) had enough subtle nondeterminism and formatting
+differences to make component-level equivalence feel like the hard
+problem. It was not. The hard problem was the orchestration, and
+component-level tests create a false sense of completeness. End-to-end
+tests should come first, not last.
 
 LLM reviewer agents are sensitive to prompt framing — adversarial
 prompts find overclaims, neutral prompts find the same gaps but frame
@@ -578,29 +565,24 @@ equivalence tests verify that output matches, but not that I understand
 
 ### Limitations
 
-This work has been tested on four datasets (up to 36K contigs), with one
-larger benchmark (MetaHIT, 60K contigs) declared but not yet run. I do
-not know how well it generalizes to larger or more complex metagenomes.
-It has not been tested in a real pipeline (nf-core/mag). It still shells
-out to HMMER, Bowtie2, and FragGeneScan (which itself still requires
-Perl). No domain expert has reviewed the reimplementation. Bin quality
-has not been assessed with tools like
-[CheckM](https://github.com/Ecogenomics/CheckM) or
+This work has been tested on five datasets, up to the full CAMI I High
+benchmark (42,038 contigs). I do not know how well it generalizes to
+larger or more complex metagenomes. It has not been tested in a real
+pipeline (nf-core/mag). It still shells out to HMMER, Bowtie2, and
+FragGeneScan (which itself still requires Perl). No domain expert has
+reviewed the reimplementation. Bin quality has not been assessed with
+tools like [CheckM](https://github.com/Ecogenomics/CheckM) or
 [BUSCO](https://busco.ezlab.org/) — the equivalence tests verify
 identical output, not whether that output is biologically meaningful.
-I do not know whether the original's nondeterministic seed ordering
-serves a purpose — I lack the expertise to evaluate this and would
-welcome input from metagenomics researchers.
 
 ## What's Next
 
 Now that equivalence is established, bug fixes can be applied as
 separate, documented changes — each with its own test showing the old
 (buggy) output and the new (correct) output. The `prob_threshold`
-default mismatch is the most user-visible fix. Testing on more and
-larger datasets is needed, as is integration with the
-[nf-core/mag](https://nf-co.re/mag) pipeline — the real goal is a
-drop-in replacement module. Longer-term, replacing FragGeneScan with
+default mismatch is the most user-visible fix. Integration with the
+[nf-core/mag](https://nf-co.re/mag) pipeline — the real goal — is the
+next step. Longer-term, replacing FragGeneScan with
 [Prodigal](https://github.com/hyattpd/Prodigal) (following
 [maxbin2_custom](https://github.com/mruehlemann/maxbin2_custom)) and
 adopting GTDB marker gene sets would address the upstream dependency
@@ -608,16 +590,19 @@ issues that Nix currently papers over. The EM inner loop is
 embarrassingly parallel and neither implementation exploits this yet —
 it is the biggest remaining performance opportunity.
 
+More broadly, the original MaxBin2 has not seen a release since 2019.
+This rewrite is, in practice, a maintenance succession: bugs can be
+fixed, dependencies updated, and the tool kept working as the ecosystem
+around it evolves.
+
 ## Conclusion
 
-The reimplementation produces near-identical output to the original
-MaxBin2. Component-level equivalence is byte-exact; end-to-end output
-matches on small datasets. On a downsampled subset of the CAMI I High
-benchmark (5000 contigs), recursive binning produces the same 114 bins,
-with 9 contigs classified differently due to a float precision
-difference between the two implementations (`long double` vs `f64`).
-The EM core is ~8x faster and the tool is installable with a single
-`nix run` command. The equivalence-first methodology —
+At the same float width, the reimplementation produces bit-for-bit
+identical output to the original MaxBin2.
+The only divergence is between the original's 80-bit `long double` and
+Rust's 64-bit `f64`: on the full CAMI I High benchmark (42,038 contigs),
+~4 contigs differ at a meaningless decision boundary. The EM core is
+~8x faster and the tool is installable with a single `nix run` command. The equivalence-first methodology —
 match the original's output, bugs included, then fix things separately
 — made the project tractable without domain expertise. Whether that
 generalizes to other bioinformatics tools in similar situations remains
