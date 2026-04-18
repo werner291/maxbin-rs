@@ -27,21 +27,43 @@ For a detailed account of how this rewrite was done and verified, see
 ## Quick start
 
 ```bash
-# Run directly via Nix (bundles HMMER, Bowtie2, FragGeneScan automatically)
+# Full pipeline — bundles HMMER, Bowtie2, FragGeneScan via Nix
 nix run github:werner291/maxbin-rs -- \
-  -contig contigs.fa.gz \
-  -reads reads.fastq.gz \
-  -out my_bins
-
-# Or build and install
-nix build github:werner291/maxbin-rs
-./result/bin/maxbin-rs --help
+  --contig contigs.fa.gz \
+  --reads reads.fastq.gz \
+  --out my_bins
 ```
 
-**Note:** maxbin-rs shells out to HMMER (`hmmsearch`), Bowtie2, and a gene
-caller (FragGeneScan) at runtime. The Nix package bundles these
-automatically. If you build with `cargo build` instead, you must have these
-tools on your PATH.
+### Skip the pipeline, just run the EM
+
+If you already have seeds (e.g. from your own marker gene detection),
+you can skip the gene caller, HMMER, and Bowtie2 entirely:
+
+```bash
+# EM only — no external tools needed
+maxbin-rs em --contig filtered.fa --abund depth.txt --seed seeds.txt --out result
+```
+
+This is the core algorithm. Everything else in the pipeline is
+orchestration to produce the seeds and abundance data.
+
+### Bring your own intermediates
+
+The pipeline also accepts pre-computed intermediates, letting you skip
+expensive stages you've already run:
+
+```bash
+# Skip gene calling + HMMER (bring your own HMMER output)
+maxbin-rs --contig contigs.fa --abund depth.txt --hmmout hits.txt --out result
+
+# Skip read alignment (bring your own abundance file)
+maxbin-rs --contig contigs.fa --abund depth.txt --out result
+```
+
+**Note:** the full pipeline shells out to HMMER, Bowtie2, and
+FragGeneScan at runtime. The Nix package bundles these automatically.
+If you build with `cargo build` instead, you must have these tools on
+your PATH.
 
 ### Docker
 
