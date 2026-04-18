@@ -1,288 +1,138 @@
 # maxbin-rs
 
-**Not yet tested inside nf-core/mag or other pipeline managers.**
-Produces identical bins to MaxBin2 2.2.7 on all tested datasets,
-with an ~8x faster EM core. If you try it, please report issues.
-
----
-
-A Rust reimplementation of [MaxBin2](https://sourceforge.net/projects/maxbin2/),
-a metagenome binning tool that clusters assembled contigs into individual genomes
-using tetranucleotide frequency and abundance information.
-
-MaxBin2 was created by
-[Yu-Wei Wu, Blake A. Simmons, and Steven W. Singer](https://doi.org/10.1093/bioinformatics/btv638).
-This project reimplements their algorithm while addressing long-standing
-packaging and reliability issues, guided by the
-[rewrites.bio](https://rewrites.bio) principles. It would not exist
-without the original MaxBin2.
-
-For a detailed account of how this rewrite was done and verified, see
-[PAPER.md](PAPER.md).
-
-
-## Quick start
-
-```bash
-# Full pipeline — bundles HMMER, Bowtie2, FragGeneScan via Nix
-nix run github:werner291/maxbin-rs -- \
-  --contig contigs.fa.gz \
-  --reads reads.fastq.gz \
-  --out my_bins/
-```
-
-Output goes to the `my_bins/` directory: `001.fasta`, `002.fasta`, ...,
-`summary`, `noclass`, `marker`, `log`.
-
-### Skip the pipeline, just run the EM
-
-If you already have seeds (e.g. from your own marker gene detection),
-you can skip the gene caller, HMMER, and Bowtie2 entirely:
-
-```bash
-# EM only — no external tools needed
-maxbin-rs em --contig filtered.fa --abund depth.txt --seed seeds.txt --out result
-```
-
-This is the core algorithm. Everything else in the pipeline is
-orchestration to produce the seeds and abundance data.
-
-### Bring your own intermediates
-
-The pipeline also accepts pre-computed intermediates, letting you skip
-expensive stages you've already run:
-
-```bash
-# Skip gene calling (bring your own protein FASTA, e.g. from Prodigal)
-maxbin-rs --contig contigs.fa --abund depth.txt --faa proteins.faa --out output/
-
-# Skip gene calling + HMMER (bring your own HMMER output)
-maxbin-rs --contig contigs.fa --abund depth.txt --hmmout hits.txt --out output/
-
-# Skip read alignment (bring your own abundance file)
-maxbin-rs --contig contigs.fa --abund depth.txt --out output/
-```
-
-The `--faa` flag was inspired by
-[maxbin2_custom](https://github.com/mruehlemann/maxbin2_custom), which
-replaced FragGeneScan with Prodigal. In principle, any gene caller that
-produces a protein FASTA should work — HMMER doesn't care where the
-sequences came from. In practice, only FragGeneScan output has been
-tested end-to-end.
-
-**Note:** the full pipeline shells out to HMMER, Bowtie2, and
-FragGeneScan at runtime. The Nix package bundles these automatically.
-If you build with `cargo build` instead, you must have these tools on
-your PATH.
-
-### Docker
-
-```bash
-docker pull ghcr.io/werner291/maxbin-rs:latest
-docker run --rm \
-  -v /path/to/data:/data \
-  ghcr.io/werner291/maxbin-rs:latest \
-  --contig /data/contigs.fa.gz \
-  --reads /data/reads.fastq.gz \
-  --out /data/output/bins
-```
-
-The image is built by Nix and includes all runtime dependencies. Published
-automatically on version tags.
-
-### Adding to a NixOS / home-manager config
-
-```nix
-# flake.nix inputs
-inputs.maxbin-rs.url = "github:werner291/maxbin-rs";
-
-# Then in your config:
-environment.systemPackages = [ inputs.maxbin-rs.packages.${system}.default ];
-# or in home-manager:
-home.packages = [ inputs.maxbin-rs.packages.${system}.default ];
-```
-
-## Verifying the claims
-
-This project claims equivalence with the original MaxBin2 — byte-identical
-for the EM core, within floating-point tolerance for abundance, identical
-as sets for seed selection.
-Here is how to check, in order of increasing time commitment:
-
-### 1. Component-level tests (~1 minute)
-
-Proptest-based equivalence: each Rust function is tested against the original
-C++ via FFI on randomized inputs. 109 tests covering all major components.
-
-```bash
-nix develop
-cargo nextest run
-```
-
-See: `tests/proptest_emanager.rs`, `tests/proptest_fasta.rs`, `tests/emanager_equivalence.rs`, and other `tests/proptest_*.rs` files
-
-### 2. Pipeline stage tests (~1–10 minutes per dataset)
-
-The primary verification. Tests each pipeline stage independently using
-pre-computed intermediates from the original MaxBin2. No Bowtie2/HMMER runs
-during the test itself — the slow parts are cached by Nix.
-
-```bash
-# B. fragilis — small, fast (~1 min, runs in CI)
-nix build .#test-pipeline-stages
-
-# minigut — multi-organism (~2 min)
-nix build .#test-pipeline-stages-minigut
-
-# CAPES_S7 — 25K contigs, ~2.5 GB download (~10 min)
-nix build .#test-pipeline-stages-capes
-
-# CAMI I High — 36K contigs, 240 bins (~50 min)
-nix build .#test-pipeline-stages-cami
-```
-
-These run in the Nix build sandbox — isolated filesystem, no network, no
-host environment. The only inputs are the explicit Nix store paths.
-
-See: `tests/pipeline-stages.sh` for detailed documentation of what each
-stage tests and example output.
-
-### 3. Component performance comparison
-
-Per-function Rust vs C++ throughput comparison:
-
-```bash
-nix run .#bench-components
-```
-
-See: `tests/bench_components.rs`
-
-## What's different from the original
-
-**Same**: algorithm, output format, known bugs (all reproduced intentionally).
-This is a faithful reimplementation, not an improvement — yet.
-
-### Known behavioral difference: seed ordering
-
-The original `_getmarker.pl` iterates marker gene clusters with Perl's
-`keys %hash`, which produces a **non-deterministic order** (randomized since
-Perl 5.18). This means the original MaxBin2 can produce different bin counts
-and assignments on the same input across runs — the EM algorithm converges to
-different local optima depending on which contigs are used as initial seeds and
-in what order.
-
-maxbin-rs always sorts seeds deterministically. The equivalence tests
-patch the original Perl to do the same (via sorted hash iteration), so
-both tools produce identical seed ordering and comparable output.
-
-### Other differences
-
-**Currently addressed**:
-- Installability: Nix flake bundles the binary with all runtime dependencies
-  (HMMER, Bowtie2, FragGeneScan). No `setting` file, no CPAN, no manual path
-  configuration. Note: FragGeneScan's `run_FragGeneScan.pl` still requires
-  a Perl interpreter (provided by Nix).
-- Reproducibility: Nix flake builds everything from source with pinned deps
-- Transparent provenance: original C++ and Perl are patched via `.patch` files
-  (see `nix/`), not vendored — every change from upstream is auditable
-- No temp files next to input: the original shells out to `gunzip -c` and
-  writes a decompressed copy next to the input contig file, which fails on
-  read-only filesystems (e.g. Nix store). maxbin-rs decompresses via
-  streaming gzip instead, avoiding the temp file at the cost of some
-  additional memory usage during decompression.
-
-**Observed**: On CAMI I High (36K contigs × 577 bins), the Rust EM is
-approximately 8x faster than the original C++ EM (see
-[PAPER.md](PAPER.md) for methodology and caveats).
-
-**Not yet addressed** (see `TODO.md`):
-- Correctness bugs (prob_threshold default, duplicate contigs, etc.)
-- FragGeneScan → Prodigal switch
-- GTDB marker gene sets
-- Per-bin marker gene tarball (`marker_of_each_bin.tar.gz`)
-- Multi-sample `.abundance` output file
-
-## Compatibility
-
-### What works
-
-All original CLI flags are supported via double-dash syntax: `--contig`,
-`--abund`, `--reads`, `--thread`, `--out`, `--min-contig-length`,
-`--max-iteration`, `--prob-threshold`, `--markerset`, `--verbose`,
-`--plotmarker`. Multiple abundance/reads files use repeated `--abund` /
-`--reads` flags. Output files: `NNN.fasta` bins, `noclass`, `summary`,
-`marker`, `log` — all inside the `--out` directory.
-
-### Known differences from the original
-
-These are intentional or unavoidable and should not affect correctness:
-
-- **Binary name**: `maxbin-rs`, not `run_MaxBin.pl`. Pipeline modules
-  that hardcode the binary name need updating.
-- **Double-dash flags** (v0.3+): `--contig` instead of `-contig`.
-  Since v0.2 already changes the default `prob_threshold`, scripts
-  need updating anyway — switching to standard flag syntax at the same
-  time gives you proper `--help`, shell completions, and robust error
-  messages via [clap](https://docs.rs/clap/). For the original
-  single-dash syntax, use v0.1.x or v0.2.x.
-- **Version output**: `maxbin-rs 0.1.3` (via `-v` or `--version`),
-  not `MaxBin 2.2.7`. Pipelines that parse version strings (e.g.
-  nf-core/mag's `sed 's/MaxBin //'`) need a one-line fix.
-- **Progress output goes to stderr**, not stdout. The original writes
-  to both stdout and the log file. Pipelines capturing stdout will see
-  less output but this shouldn't affect behavior.
-- **Exit code**: `1` on error (the original uses `-1` / 255 for some
-  errors). Pipelines checking for non-zero should be unaffected.
-- **`--out` is a directory** (v0.3+): `--out my_bins/` creates a
-  directory with `001.fasta`, `summary`, etc. inside. The original uses
-  `--out` as a filename prefix. The directory errors if non-empty unless
-  `--force-overwrite` is passed.
-- **Intermediate files go to a temp directory**, cleaned up automatically
-  on success. Use `--keep-intermediates` to preserve them (defaults to
-  `./intermediates/maxbin-rs-<id>/`). Use `--work-dir` to control where
-  they go. The original writes temp files next to the input, which fails
-  on read-only filesystems.
-
-### Missing output files
-
-- Per-bin marker tarball (`marker_of_each_bin.tar.gz`)
-- Multi-sample `.abundance` file
-- `--verbose` and `--plotmarker` are accepted but silently ignored
-
-### nf-core/mag
-
-The goal is a drop-in replacement for the MaxBin2 module in
-[nf-core/mag](https://nf-co.re/mag). The missing output files above
-are `optional: true` in the nf-core module and won't crash the pipeline.
-**Not tested in a real nf-core/mag run yet.** If you try this, please
-report any issues.
-
-## Versioning
-
-See [VERSIONING.md](VERSIONING.md) for the full policy. In short:
-
-- **v0.1.x** — bug-for-bug compatible drop-in replacement.
-  Output is bit-identical at the same float width. Same single-dash
-  CLI flags, same `--out` prefix behavior, same output filenames.
-  Use this if you need to swap MaxBin2 out without changing scripts.
-- **v0.2.x** — correctness fixes that change output (e.g.,
-  `prob_threshold` default). CLI flags switch to double-dash syntax.
-- **v0.3+** — breaking CLI changes: `--out` is now a directory (not a
-  prefix), output files are `001.fasta` (not `prefix.001.fasta`),
-  intermediate files go to a temp directory instead of cwd. Binning
-  algorithm is unchanged from v0.2.x.
-
-"Breaking change" means "changes binning output on the same input." Crash fixes,
-better errors, and performance improvements are never breaking.
-
-## Citation
-
-If you use this tool, please cite the original work:
+A Rust reimplementation of [MaxBin2](https://sourceforge.net/projects/maxbin2/)
+by [Yu-Wei Wu, Blake A. Simmons, and Steven W. Singer](https://doi.org/10.1093/bioinformatics/btv638) —
+a metagenome binning tool that clusters assembled contigs into individual
+genomes using tetranucleotide frequency and abundance information.
 
 > Wu Y-W, Simmons BA, Singer SW. **MaxBin 2.0: an automated binning algorithm to
 > recover genomes from multiple metagenomic datasets.** *Bioinformatics.*
 > 2016;32(4):605–607. doi:[10.1093/bioinformatics/btv638](https://doi.org/10.1093/bioinformatics/btv638)
 
-This reimplementation follows the [rewrites.bio](https://rewrites.bio) manifesto
-for responsible rewrites of bioinformatics tools, and would not exist without
-the original MaxBin2.
+This project reimplements their algorithm while addressing long-standing
+packaging and reliability issues. Not yet tested inside nf-core/mag or
+other pipeline managers — if you try it, please report issues.
+
+If referring specifically to this reimplementation, please also cite:
+
+> Kroneman W. **maxbin-rs: a Rust reimplementation of MaxBin2.** 2026.
+> https://github.com/werner291/maxbin-rs
+
+Always cite the original MaxBin2 first — the algorithm is theirs.
+
+## Quick start
+
+```bash
+# Nix (builds everything from source, pinned deps)
+nix run github:werner291/maxbin-rs -- \
+  --contig contigs.fa.gz --reads reads.fastq.gz --out my_bins/
+
+# Docker (for pipeline integration — pin to a version tag)
+docker run --rm -v /path/to/data:/data \
+  ghcr.io/werner291/maxbin-rs:v0.3.0 \
+  --contig /data/contigs.fa.gz --reads /data/reads.fastq.gz --out /data/bins
+```
+
+Both bundle HMMER, Bowtie2, and FragGeneScan. A bioconda package is
+planned. You can also `cargo build --release` if you have these tools
+on PATH.
+
+For a drop-in replacement that matches the original MaxBin2 CLI
+exactly, use a v0.1.x release (e.g. `ghcr.io/werner291/maxbin-rs:v0.1.3`).
+
+### Inputs
+
+- **`--contig`** — assembled contigs (FASTA, optionally gzipped).
+- **`--abund`** — per-contig read depth (tab-separated: contig name, depth).
+  Pass once per sample:
+  `--abund sample1.txt --abund sample2.txt --abund sample3.txt`
+- **`--reads`** — raw reads (FASTQ, optionally gzipped). Abundance is
+  computed via Bowtie2 mapping. Pass once per sample:
+  `--reads sample1.fq.gz --reads sample2.fq.gz`
+
+Use `--abund` or `--reads`, not both. Default minimum contig length is
+1000 bp. Run `maxbin-rs --help` for all options.
+
+### Output
+
+```
+my_bins/
+├── 001.fasta    # bin 1
+├── 002.fasta    # bin 2
+├── ...
+├── summary      # per-bin completeness, genome size, GC
+├── noclass      # contigs not assigned to any bin
+├── marker       # marker gene counts per bin
+└── log          # tool version and run metadata
+```
+
+### EM subcommand
+
+The EM algorithm is the core of MaxBin. If you already have abundance
+data and seed contigs (e.g. from your own marker gene pipeline), you
+can run it directly without any external tools:
+
+```bash
+maxbin-rs em --contig filtered.fa --abund depth.txt --seed seeds.txt --out result
+```
+
+The default mode (`maxbin-rs pipeline`) wraps this with gene calling
+(FragGeneScan), marker detection (HMMER), and read mapping (Bowtie2) to
+produce seeds and abundance automatically. You can also supply your own
+intermediates via `--faa` (protein FASTA) or `--hmmout` (HMMER output)
+to substitute individual stages. See `maxbin-rs --help` for all options.
+
+## Migrating from MaxBin2
+
+```bash
+# before
+run_MaxBin.pl -contig contigs.fa -reads reads.fq -out results/my_sample
+# produces: results/my_sample.001.fasta, results/my_sample.summary, ...
+
+# after
+maxbin-rs --contig contigs.fa --reads reads.fq --out results/my_sample/
+# produces: results/my_sample/001.fasta, results/my_sample/summary, ...
+```
+
+What to update in your scripts:
+
+- Binary: `maxbin-rs` instead of `run_MaxBin.pl`
+- Flags use double dashes: `--contig`, `--reads`, `--out`
+- `--out` is a directory, not a filename prefix
+- Output files: `001.fasta` instead of `prefix.001.fasta`
+- Version string: `maxbin-rs X.Y.Z` instead of `MaxBin 2.2.7`
+- Progress goes to stderr, not stdout
+- Exit code `1` on error (original uses `-1` / 255)
+- Not yet produced: per-bin marker tarball, multi-sample `.abundance`
+  file (both `optional: true` in nf-core/mag)
+
+If you can't change your scripts at all, **v0.1.x** uses the original
+single-dash flags and prefix-based `--out` — it's a drop-in replacement
+for `run_MaxBin.pl`. Bug fixes and performance improvements are
+backported as long as they don't change output.
+
+See [VERSIONING.md](VERSIONING.md) for the full version policy.
+
+## Verification
+
+The v0.1.x series was verified to produce identical output to MaxBin2
+2.2.7. Later versions build on that as a baseline, adding bug fixes,
+performance improvements, and interface changes. The evidence is
+described in detail in [PAPER.md](PAPER.md). In short:
+
+- **Unit/property tests** compare each Rust function against the
+  original C++ via FFI on randomized inputs (`cargo nextest run`).
+- **Per-stage tests** compare each pipeline stage independently against
+  the original MaxBin2 on multiple datasets:
+  ```bash
+  nix build .#test-pipeline-stages       # B. fragilis (~1 min)
+  nix build .#test-pipeline-stages-cami  # CAMI I High, 36K contigs (~50 min)
+  ```
+- **End-to-end tests** run the full pipeline (including recursive
+  binning) on CAMI I High: all bins byte-identical.
+- The EM core is approximately **8x faster** than the original C++
+  (see PAPER.md for methodology).
+
+These results have not been independently verified. If you do run your
+own comparison, we'd welcome the feedback.
+
