@@ -39,20 +39,7 @@
 
 ## Plan
 
-1. **v0.3: File I/O rework** — clean up how the pipeline handles intermediate and output files.
-   - `--out <dir>` becomes an output directory (default `./output/`). Bins are
-     `001.fasta`, `002.fasta`, etc. inside it. Errors if directory exists and is
-     non-empty, unless `--force-overwrite`.
-   - Intermediates (filtered contigs, SAM, .bt2, .faa, .hmmout, seeds, abundance)
-     go in a tempdir (`$TMPDIR/maxbin-rs-<id>/`), auto-deleted on success.
-   - `--keep-intermediates` keeps the work dir; defaults to
-     `./intermediates/maxbin-rs-<id>/` when no `--work-dir` is set.
-   - `--work-dir <path>` overrides intermediate location (always creates
-     `<path>/maxbin-rs-<id>/` subdirectory).
-   - On error: always preserve intermediates for debugging.
-   - Gitignore `intermediates/`.
-   - Fixes the bug where cleanup deletes user-provided input files — only the
-     work dir (which only contains generated files) is ever deleted.
-   - Pipe bowtie2 SAM output to stdout where possible to avoid landing SAM files.
-   - Keep filtered contigs and seeds in memory instead of writing to disk.
+1. **Bioconda package** — submit recipe to bioconda-recipes. Runtime deps
+   (hmmer, bowtie2, fraggenescan) are already in bioconda. The C++ FFI is
+   dev-only and doesn't need to build on macOS.
 2. **nf-core/mag module** — drop-in replacement.
