@@ -94,6 +94,17 @@
           extraPatches = [ ./nix/maxbin2-cpp-ffi-f64.patch ];
         };
 
+        # MaxBin2 variants with trace logging for pipeline-trace.sh.
+        # Adds [trace] lines to stderr showing recursion depth, bin names,
+        # and sub-bin counts at each step — observation only, no behavior change.
+        tracePatch = ./nix/maxbin2-trace-logging.patch;
+        maxbin2-trace = maxbin2.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ tracePatch ];
+        });
+        maxbin2-f64-trace = maxbin2-f64.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ tracePatch ];
+        });
+
         # The Rust reimplementation — this is the main output of this project.
         maxbin-rs = pkgs.rustPlatform.buildRustPackage {
           pname = "maxbin-rs";
@@ -247,6 +258,8 @@
           inherit
             maxbin2
             maxbin2-f64
+            maxbin2-trace
+            maxbin2-f64-trace
             maxbin-rs
             maxbin-rs-lto
             rust
@@ -315,8 +328,9 @@
             test-cli-equivalence
             test-cli-equivalence-minigut
             test-cli-equivalence-capes
-            test-recursion-smoke
-            test-recursion-smoke-f64
+            trace-cami-small
+            trace-cami-small-f64
+            trace-cami
             test-precision-divergence
             bench-components
             bench-cpp-lto

@@ -24,6 +24,8 @@
   binutils-unwrapped,
   maxbin2,
   maxbin2-f64,
+  maxbin2-trace,
+  maxbin2-f64-trace,
   maxbin-rs,
   maxbin-rs-lto,
   rust,
@@ -119,6 +121,37 @@ let
 
         touch $out
       '';
+
+  # Pipeline trace — runs both maxbin-rs and original MaxBin2 on the same
+  # input through the full recursive pipeline, and prints a structural
+  # trace of bin sizes across recursion depths. No pass/fail verdict.
+  #
+  # Factory: mkPipelineTrace { name, contigs, intermediates', maxbin2' }
+  # Uses trace-instrumented MaxBin2 by default (adds [trace] lines to stderr).
+  #
+  #   nix run .#trace-cami-small       (downsampled CAMI, 5000 contigs)
+  #   nix run .#trace-cami-small-f64   (same, C++ patched to double)
+  #   nix run .#trace-cami             (full CAMI I High)
+  mkPipelineTrace =
+    {
+      name,
+      contigs,
+      intermediates',
+      maxbin2' ? maxbin2-trace,
+    }:
+    writeShellApplication {
+      name = "trace-${name}";
+      runtimeInputs = [
+        maxbin2'
+        maxbin-rs
+      ];
+      text = ''
+        bash ${../tests/pipeline-trace.sh} \
+          "${contigs}" \
+          "${intermediates'}/abund" \
+          "${intermediates'}/hmmout"
+      '';
+    };
 in
 {
   test-pipeline-stages = mkStageTest {
@@ -183,28 +216,24 @@ in
     intermediates' = intermediates.capes;
   };
 
-  # Recursive binning smoke test — runs both tools on downsampled CAMI (5000
-  # contigs), compares structural properties (bin count, genome size).
-  # Triggers depth-5 recursion in ~7 minutes.
-  test-recursion-smoke =
-    runCommand "test-recursion-smoke"
-      {
-        nativeBuildInputs = [
-          maxbin2
-          maxbin-rs
-        ];
-      }
-      ''
-        export CONTIGS="${intermediates.cami-small}/contigs.fa"
-        export ABUND="${intermediates.cami-small}/abund"
-        export HMMOUT="${intermediates.cami-small}/hmmout"
-        export MAXBIN_RS_DETERMINISTIC=1
-        export HOME=$(mktemp -d)
+  trace-cami-small = mkPipelineTrace {
+    name = "cami-small";
+    contigs = "${intermediates.cami-small}/contigs.fa";
+    intermediates' = intermediates.cami-small;
+  };
 
-        bash ${../tests/cli-recursion-smoke.sh}
+  trace-cami-small-f64 = mkPipelineTrace {
+    name = "cami-small-f64";
+    contigs = "${intermediates.cami-small}/contigs.fa";
+    intermediates' = intermediates.cami-small;
+    maxbin2' = maxbin2-f64-trace;
+  };
 
-        touch $out
-      '';
+  trace-cami = mkPipelineTrace {
+    name = "cami";
+    contigs = "${datasets.cami-i-high.contigs}";
+    intermediates' = intermediates.cami;
+  };
 
   # Precision divergence test — runs the Rust EM and C++ EM (via FFI)
   # on a 14-contig sub-bin from CAMI I High where the long double vs f64
@@ -224,28 +253,6 @@ in
         cp -r ${../.}/* .
         chmod -R u+w .
         cargo nextest run emanager_precision_divergence --no-fail-fast
-        touch $out
-      '';
-
-  # Same smoke test but with the C++ patched to use double instead of
-  # long double — isolates precision as the source of divergence.
-  test-recursion-smoke-f64 =
-    runCommand "test-recursion-smoke-f64"
-      {
-        nativeBuildInputs = [
-          maxbin2-f64
-          maxbin-rs
-        ];
-      }
-      ''
-        export CONTIGS="${intermediates.cami-small}/contigs.fa"
-        export ABUND="${intermediates.cami-small}/abund"
-        export HMMOUT="${intermediates.cami-small}/hmmout"
-        export MAXBIN_RS_DETERMINISTIC=1
-        export HOME=$(mktemp -d)
-
-        bash ${../tests/cli-recursion-smoke.sh}
-
         touch $out
       '';
 

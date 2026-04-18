@@ -105,14 +105,13 @@ fn emanager_cpp_vs_rust() {
 }
 
 /// Regression test: a 14-contig sub-bin from CAMI I High (depth 4 of
-/// recursive binning) where the Rust EM and C++ EM diverge.
+/// recursive binning) that previously diverged between Rust and C++.
 ///
-/// With `long double` (C++) vs `f64` (Rust), the probability threshold
-/// cutoff lands differently: C++ classifies 0/14 contigs (all noclass),
-/// Rust classifies 13/14 into a bin.
-///
-/// This test documents the known precision divergence. It uses real
-/// metagenomics data extracted from the CAMI I High benchmark.
+/// The divergence was caused by float multiplication ordering in the
+/// M-step: `abund * (len * prob)` vs `(abund * len) * prob`. After
+/// matching the C++ evaluation order, both implementations produce
+/// bit-identical output on this fixture (C++ FFI uses `double`, same
+/// width as Rust's `f64`).
 #[test]
 fn emanager_precision_divergence_cami_depth4() {
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/divergent-em");
@@ -180,37 +179,28 @@ fn emanager_precision_divergence_cami_depth4() {
         rust_bins.len()
     );
 
-    // Document the known divergence: C++ classifies 0 contigs, Rust classifies 13.
-    // This is caused by long double (80-bit) vs f64 (64-bit) precision in the
-    // probability computation. On this marginal 14-contig sub-bin, the threshold
-    // cutoff (0.5) lands differently.
+    // This fixture previously diverged due to float multiplication ordering:
+    // the Rust M-step computed `abund * (len * prob)` while C++ computes
+    // `abund * len * prob` (left-to-right). The 1 ULP difference compounded
+    // over EM iterations, eventually flipping a threshold decision at prob ≈ 0.5.
     //
-    // If this test starts PASSING (both produce the same output), it means the
-    // precision gap has been closed — update this test to assert equality.
-    if cpp_bins.len() == rust_bins.len() {
-        eprintln!("UNEXPECTED: C++ and Rust agree! Precision gap may be closed.");
-        // Verify they actually match
-        for suffix in &["noclass", "0001.fasta"] {
-            let rust_file = format!("{}.{}", rust_prefix, suffix);
-            let cpp_file = format!("{}.{}", cpp_prefix, suffix);
-            let rust_bytes = std::fs::read(&rust_file).unwrap_or_default();
-            let cpp_bytes = std::fs::read(&cpp_file).unwrap_or_default();
-            assert_eq!(rust_bytes, cpp_bytes, "{} differs", suffix);
-        }
-    } else {
-        // Known divergence — document but don't fail
-        eprintln!(
-            "Known precision divergence: C++ {} bins, Rust {} bins (long double vs f64)",
-            cpp_bins.len(),
-            rust_bins.len()
-        );
-        // Assert the specific known behavior so we notice if it changes
-        assert_eq!(cpp_bins.len(), 0, "C++ should produce 0 bins on this input");
-        assert_eq!(
-            rust_bins.len(),
-            1,
-            "Rust should produce 1 bin on this input"
-        );
+    // After matching the C++ evaluation order, both produce identical output.
+    // The C++ FFI uses `double` (not `long double`), so this tests same-width
+    // float equivalence. The standalone MaxBin2 binary still uses `long double`
+    // (80-bit), which is a genuinely different precision — not a bug.
+    assert_eq!(
+        cpp_bins.len(),
+        rust_bins.len(),
+        "C++ and Rust should produce the same number of bins (got C++={}, Rust={})",
+        cpp_bins.len(),
+        rust_bins.len()
+    );
+    for suffix in &["noclass", "0001.fasta"] {
+        let rust_file = format!("{}.{}", rust_prefix, suffix);
+        let cpp_file = format!("{}.{}", cpp_prefix, suffix);
+        let rust_bytes = std::fs::read(&rust_file).unwrap_or_default();
+        let cpp_bytes = std::fs::read(&cpp_file).unwrap_or_default();
+        assert_eq!(rust_bytes, cpp_bytes, "{} differs", suffix);
     }
 
     let _ = std::fs::remove_dir_all(&test_dir);

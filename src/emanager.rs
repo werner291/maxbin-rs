@@ -464,14 +464,20 @@ pub fn run_em(state: &mut EmState, params: &EmParams) {
                     && !state.seq_prob[j][si].is_nan()
                     && !state.is_profile_n[j]
                 {
-                    // Matches EManager.cpp:1108-1111: weight = len * seq_prob; accumulate abundance
-                    let weight = len as f64 * state.seq_prob[j][si];
+                    // Matches EManager.cpp:871: seed_abundance[i][k] += seq_abundance[k][j] * len * prob
+                    // IMPORTANT: must match C++ evaluation order (abund * len * prob),
+                    // NOT (abund * (len * prob)). Float multiplication is non-associative;
+                    // different parenthesization causes 1 ULP drift that compounds over
+                    // EM iterations and eventually flips threshold decisions.
+                    let len_f = len as f64;
+                    let prob = state.seq_prob[j][si];
                     for (sa, seq_ab) in state.seed_abundance[si]
                         .iter_mut()
                         .zip(state.seq_abundance.iter())
                     {
-                        *sa += seq_ab[j] * weight;
+                        *sa += seq_ab[j] * len_f * prob;
                     }
+                    let weight = len_f * prob;
                     // Matches EManager.cpp:1112: d += len * seq_prob
                     d += weight;
                     // Matches EManager.cpp:1114: seed_profile[i]->addProfile(seq_profile[j], len * prob)

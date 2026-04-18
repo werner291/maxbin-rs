@@ -1,0 +1,49 @@
+--- a/run_MaxBin.pl	2026-04-18 10:09:55.450928850 +0200
++++ b/run_MaxBin.pl	2026-04-18 10:11:09.704383825 +0200
+@@ -466,6 +466,9 @@
+ 
+ 	while ($currnum < $maxnum)
+ 	{
++		my @_td = $binarr[$currnum] =~ /[0-9]{4}.out/g;
++		my $_depth = scalar @_td;
++		print STDERR "[trace] depth=$_depth bin=$binarr[$currnum] queue=$currnum/$maxnum\n";
+ 		$currbin = $binarr[$currnum];
+ 
+ 		if ($currbin eq $contig_f)
+@@ -502,11 +505,13 @@
+ 		}
+ 		elsif ($currbin ne $contig_f && $j >= $RECURSION_MAX)
+ 		{
++			print STDERR "[trace]   skipped (recursion limit)\n";
+ 			$currnum++;
+ 			next;
+ 		}
+ 		elsif ($currbin ne $contig_f && $i == -1)
+ 		{
++			print STDERR "[trace]   skipped (no seeds)\n";
+ 			$currnum++;
+ 			next;
+ 		}
+@@ -557,12 +562,14 @@
+ 		push(@noclassarr, $currout);
+ 
+ 		# Read in summary file and putting bins into stack
++		my $_newbins = 0;
+ 		open(FILE, "<$currout.summary");
+ 		while(defined($line = <FILE>))
+ 		{
+ 			chomp($line);
+ 			if ($line =~ /^Bin \[([A-Za-z0-9._\\\/\@\!\|\#\$\%\^\?\<\>\[\]\{\}\(\)\+\-]+)\]\t([0-9.\t]+)/)
+ 			{
++				$_newbins++;
+ 				push(@binarr, $1);
+ 				@arr = split(/\t/, $2);
+ 				push(@summarr, $arr[0]);
+@@ -572,6 +579,7 @@
+ 			}
+ 		}
+ 		close(FILE);
++		print STDERR "[trace]   produced $_newbins bins\n";
+ 
+ 		$currnum++;
+ 		touch("$currout.$FINISH");

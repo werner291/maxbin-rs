@@ -126,6 +126,46 @@ fn main() {
         );
     }
 
+    // Step 3b: Optionally inject seq_prob dump code into EManager.cpp.
+    // Set MAXBIN_RS_DUMP_SEQPROB=1 to enable per-iteration hex dumps.
+    println!("cargo:rerun-if-env-changed=MAXBIN_RS_DUMP_SEQPROB");
+    if env::var("MAXBIN_RS_DUMP_SEQPROB").is_ok() {
+        let em_path = cpp_dir.join("EManager.cpp");
+        let src = fs::read_to_string(&em_path).unwrap();
+        // Insert dump code after the E-step loop closes (after "is_estimated[i] = true;" block)
+        let needle = "is_estimated[i] = true;\n\t\t\t}\n\t\t}\n\n\t\tif (diff_count == 0)";
+        let dump_code = r#"is_estimated[i] = true;
+			}
+		}
+
+		// Debug dump: seq_prob after E-step
+		if (getenv("MAXBIN_RS_DUMP_SEQPROB")) {
+			fprintf(stderr, "[dump] iteration %d seq_prob:\n", run + 1);
+			for (i = 0; i < seqnum; i++) {
+				fprintf(stderr, "[dump]   contig %d:", i);
+				for (j = 0; j < seed_num; j++) {
+					uint64_t bits;
+					memcpy(&bits, &seq_prob[i][j], sizeof(bits));
+					fprintf(stderr, " 0x%016lx", bits);
+				}
+				fprintf(stderr, " bin=%d\n", seq_bin[i]);
+			}
+		}
+
+		if (diff_count == 0)"#;
+        let patched = src.replace(needle, dump_code);
+        if patched == src {
+            panic!("Failed to inject seq_prob dump — needle not found in EManager.cpp");
+        }
+        // Also need stdint.h and string.h for uint64_t and memcpy
+        let patched = patched.replace(
+            "#include <fstream>",
+            "#include <fstream>\n#include <stdint.h>\n#include <string.h>",
+        );
+        fs::write(&em_path, patched).unwrap();
+        eprintln!("build.rs: injected seq_prob dump code into EManager.cpp");
+    }
+
     // Step 4: Copy FFI wrapper files alongside the upstream source.
     let ffi_dir = manifest_dir.join("vendor/ffi");
     for wrapper in FFI_WRAPPERS {
