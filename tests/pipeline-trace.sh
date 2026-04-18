@@ -62,7 +62,8 @@ bin_table() {
 
 echo "=== Pipeline Trace ==="
 echo ""
-echo "  contigs: $CONTIGS ($(grep -c '^>' "$CONTIGS") sequences)"
+N_CONTIGS=$(zgrep -c '^>' "$CONTIGS" 2>/dev/null || grep -c '^>' "$CONTIGS")
+echo "  contigs: $CONTIGS ($N_CONTIGS sequences)"
 echo "  abundance: $ABUND ($(wc -l < "$ABUND") lines)"
 echo "  hmmout: $HMMOUT"
 echo ""
@@ -74,13 +75,18 @@ ORIG="$WORK/orig"
 mkdir -p "$ORIG"
 
 echo "--- Running original MaxBin2 ---"
-cp "$CONTIGS" "$ORIG/contigs.fa"
+# Decompress contigs if gzipped — MaxBin2 detects by extension, not magic bytes
+if gzip -t "$CONTIGS" 2>/dev/null; then
+  zcat "$CONTIGS" > "$ORIG/contigs.fa"
+else
+  cp "$CONTIGS" "$ORIG/contigs.fa"
+fi
 cp "$HMMOUT" "$ORIG/test.contig.tmp.hmmout"
 touch "$ORIG/test.contig.tmp.hmmout.FINISH"
 ORIG_START=$SECONDS
 run_MaxBin.pl -contig "$ORIG/contigs.fa" \
   -abund "$ABUND" -out "$ORIG/test" -thread 1 \
-  2>&1 | sed 's/^/  orig│ /'
+  2>&1 | grep --line-buffered -E '^\[trace\]|MaxBin 2\.|^Iteration' | grep --line-buffered -v 'skipped (no seeds)' | sed -u 's/^/  orig│ /'
 ORIG_ELAPSED=$((SECONDS - ORIG_START))
 echo ""
 printf "  wall time: %dm%02ds\n\n" $((ORIG_ELAPSED / 60)) $((ORIG_ELAPSED % 60))
@@ -95,7 +101,7 @@ echo "--- Running maxbin-rs ---"
 RUST_START=$SECONDS
 maxbin-rs -contig "$CONTIGS" \
   -abund "$ABUND" -hmmout "$HMMOUT" -out "$RUST/test" -thread 1 \
-  2>&1 | sed 's/^/  rust│ /'
+  2>&1 | grep --line-buffered -v -E 'candidate: marker=|^  seed: |EM iteration [0-9]|no seeds .* skipping|median ≤ 1' | sed -u 's/^/  rust│ /'
 RUST_ELAPSED=$((SECONDS - RUST_START))
 echo ""
 printf "  wall time: %dm%02ds\n\n" $((RUST_ELAPSED / 60)) $((RUST_ELAPSED % 60))
