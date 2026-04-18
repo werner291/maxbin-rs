@@ -1,31 +1,17 @@
-/// CLI argument parsing — backwards-compatible with run_MaxBin.pl's flag syntax.
+/// CLI argument parsing.
 ///
-/// The original uses single-dash flags (-contig, -reads, -reads2, -reads3, etc.)
-/// parsed via a custom loop over @ARGV. We reproduce the exact same interface so
-/// that pipelines (nf-core/mag, metaWRAP, atlas, etc.) can substitute maxbin-rs
-/// without changing their invocations.
+/// v0.3 BREAKING CHANGE: flags now use standard double-dash syntax
+/// (`--contig`, `--reads`, etc.) instead of the original's single-dash
+/// (`-contig`, `-reads`). Multiple abundance/reads files use repeated
+/// `--abund` / `--reads` flags instead of `-abund2`, `-abund3`.
 ///
 /// Subcommands expose individual pipeline stages:
-///   maxbin-rs filter     — filter contigs by minimum length
-///   maxbin-rs seeds      — generate seed file from HMMER marker gene hits
-///   maxbin-rs em         — run the Rust EM algorithm
-///   maxbin-rs cpp-em     — run the original C++ EM via FFI (equivalence testing)
+///   maxbin-rs filter       — filter contigs by minimum length
+///   maxbin-rs seeds        — generate seed file from HMMER marker gene hits
+///   maxbin-rs em           — run the Rust EM algorithm
+///   maxbin-rs cpp-em       — run the original C++ EM via FFI (equivalence testing)
 ///   maxbin-rs sam-to-abund — compute abundance from a SAM file
-///   maxbin-rs pipeline   — run the full pipeline (default when no subcommand given)
-///
-/// When no subcommand is detected, all arguments are treated as the legacy
-/// single-dash flag syntax and dispatched to `pipeline` for backwards compatibility.
-///
-/// ## Preprocessing
-///
-/// Because the original uses single-dash long flags and numbered flag variants
-/// (-reads2, -abund3), raw arguments are preprocessed before clap sees them:
-///
-/// 1. `-flag` → `--flag` (single-dash long flags → double-dash)
-/// 2. `-reads2`, `-abund3` → `--reads`, `--abund` (numbered variants collapsed)
-/// 3. `_` → `-` in flag names (underscore/hyphen normalization)
-/// 4. `-v` → `--version`
-/// 5. If no subcommand detected, `pipeline` is prepended
+///   maxbin-rs pipeline     — run the full pipeline (default when no subcommand given)
 use std::path::PathBuf;
 
 use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
@@ -196,119 +182,37 @@ pub struct SamToAbundArgs {
 }
 
 // ---------------------------------------------------------------------------
-// Preprocessing: massage raw args for clap compatibility
-// ---------------------------------------------------------------------------
-
-/// Preprocess CLI arguments for clap compatibility.
-///
-/// Normalizes single-dash long flags to double-dash, collapses numbered flag
-/// variants (-reads2, -abund3) to their base form, and prepends the `pipeline`
-/// subcommand when no explicit subcommand is given.
-fn preprocess_args(raw: &[String]) -> Vec<String> {
-    if raw.is_empty() {
-        return vec![];
-    }
-
-    let normalized: Vec<String> = raw.iter().map(|a| normalize_arg(a)).collect();
-    let first = &normalized[0];
-
-    // If first arg doesn't start with '-', it's a subcommand name — pass through
-    if !first.starts_with('-') {
-        return normalized;
-    }
-
-    // Top-level --version / --help should not get a subcommand prepended
-    if first == "--version" || first == "--help" {
-        return normalized;
-    }
-
-    // Legacy mode: no subcommand given, prepend "pipeline"
-    let mut result = Vec::with_capacity(normalized.len() + 1);
-    result.push("pipeline".to_string());
-    result.extend(normalized);
-    result
-}
-
-/// Normalize a single CLI argument for clap compatibility.
-///
-/// - Converts single-dash long flags to double-dash: `-contig` → `--contig`
-/// - Normalizes underscores to hyphens: `-min_contig_length` → `--min-contig-length`
-/// - Collapses numbered variants: `-reads2` → `--reads`, `-abund3` → `--abund`
-/// - Maps `-v` to `--version`
-/// - Non-flag arguments pass through unchanged.
-fn normalize_arg(arg: &str) -> String {
-    if !arg.starts_with('-') {
-        return arg.to_string();
-    }
-
-    let stripped = arg.trim_start_matches('-');
-    if stripped.is_empty() {
-        return arg.to_string();
-    }
-
-    // -v → --version (matches run_MaxBin.pl's -v flag)
-    if stripped == "v" {
-        return "--version".to_string();
-    }
-
-    // Normalize to underscores for pattern matching, then to hyphens for clap
-    let with_underscores = stripped.replace('-', "_");
-    let base = collapse_numbered_flag(&with_underscores);
-    format!("--{}", base.replace('_', "-"))
-}
-
-/// Collapse numbered flag variants to their base form.
-///
-/// Matches run_MaxBin.pl's regex patterns:
-/// - `/^\-reads/` catches -reads, -reads2, -reads3, etc.
-/// - `/^\-abund/` catches -abund, -abund2, -abund3, etc.
-///
-/// Does NOT collapse -reads_list or -abund_list (those are separate flags).
-fn collapse_numbered_flag(name: &str) -> String {
-    for prefix in &["reads", "abund"] {
-        if let Some(suffix) = name.strip_prefix(prefix)
-            && !suffix.is_empty()
-            && suffix != "_list"
-            && suffix.chars().all(|c| c.is_ascii_digit())
-        {
-            return (*prefix).to_string();
-        }
-    }
-    name.to_string()
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Parse CLI arguments, detecting subcommands or falling back to legacy mode.
+/// Parse CLI arguments. If no subcommand is given, assumes `pipeline`.
 pub fn parse() -> Command {
     let args: Vec<String> = std::env::args().collect();
     parse_from(&args[1..])
 }
 
 pub fn parse_from(args: &[String]) -> Command {
-    let preprocessed = preprocess_args(args);
-    let cli_args = std::iter::once("maxbin-rs".to_string()).chain(preprocessed);
+    // If first arg looks like a flag (not a subcommand), prepend "pipeline"
+    let needs_default = args.first().is_some_and(|a| a.starts_with('-'))
+        && args[0] != "--version"
+        && args[0] != "--help";
 
-    match ClapCli::try_parse_from(cli_args) {
+    let cli_args: Vec<String> = if needs_default {
+        std::iter::once("maxbin-rs".to_string())
+            .chain(std::iter::once("pipeline".to_string()))
+            .chain(args.iter().cloned())
+            .collect()
+    } else {
+        std::iter::once("maxbin-rs".to_string())
+            .chain(args.iter().cloned())
+            .collect()
+    };
+
+    match ClapCli::try_parse_from(&cli_args) {
         Ok(cli) => cli.command,
         Err(e) => {
-            use clap::error::ErrorKind;
-            match e.kind() {
-                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => {
-                    e.print().expect("failed to write to stdout");
-                    std::process::exit(0);
-                }
-                _ => {
-                    // Rewrite clap's "unexpected argument" to "Unrecognized token"
-                    // for backwards-compatible error messages.
-                    let msg = e.render().to_string();
-                    let msg = msg.replace("unexpected argument", "Unrecognized token");
-                    eprint!("{msg}");
-                    std::process::exit(1);
-                }
-            }
+            e.print().expect("failed to write to stdout");
+            std::process::exit(if e.use_stderr() { 1 } else { 0 });
         }
     }
 }
@@ -410,242 +314,42 @@ mod tests {
     }
 
     #[test]
-    fn parse_original_syntax() {
+    fn implicit_pipeline_subcommand() {
         let Command::Pipeline(cli) = parse_from(&args(&[
-            "-contig",
-            "contigs.fa",
-            "-reads",
-            "r1.fq",
-            "-reads2",
-            "r2.fq",
-            "-out",
-            "output",
-            "-thread",
-            "4",
+            "--contig", "c.fa", "--reads", "r.fq", "--out", "o",
         ])) else {
             panic!("Expected Pipeline")
         };
-        assert_eq!(cli.contig, PathBuf::from("contigs.fa"));
-        assert_eq!(cli.reads.len(), 2);
-        assert_eq!(cli.out, "output");
-        assert_eq!(cli.thread, 4);
+        assert_eq!(cli.contig, PathBuf::from("c.fa"));
     }
 
     #[test]
-    fn parse_double_dash_syntax() {
+    fn multiple_abund_flags() {
         let Command::Pipeline(cli) = parse_from(&args(&[
-            "--contig",
-            "contigs.fa",
-            "--reads",
-            "r1.fq",
-            "--out",
-            "output",
-            "--thread",
-            "4",
+            "--contig", "c.fa", "--abund", "a1.txt", "--abund", "a2.txt", "--out", "o",
         ])) else {
             panic!("Expected Pipeline")
         };
-        assert_eq!(cli.contig, PathBuf::from("contigs.fa"));
-        assert_eq!(cli.reads.len(), 1);
-        assert_eq!(cli.out, "output");
-        assert_eq!(cli.thread, 4);
-    }
-
-    #[test]
-    fn parse_abund_numbered() {
-        let Command::Pipeline(cli) = parse_from(&args(&[
-            "-contig", "c.fa", "-abund", "a1.txt", "-abund2", "a2.txt", "-abund3", "a3.txt",
-            "-out", "o",
-        ])) else {
-            panic!("Expected Pipeline")
-        };
-        assert_eq!(cli.abund.len(), 3);
-    }
-
-    #[test]
-    fn normalize_args() {
-        assert_eq!(normalize_arg("-contig"), "--contig");
-        assert_eq!(normalize_arg("--contig"), "--contig");
-        assert_eq!(normalize_arg("--min-contig-length"), "--min-contig-length");
-        assert_eq!(normalize_arg("-min_contig_length"), "--min-contig-length");
-        assert_eq!(
-            normalize_arg("-preserve_intermediate"),
-            "--preserve-intermediate"
-        );
-        assert_eq!(normalize_arg("-v"), "--version");
-        assert_eq!(normalize_arg("-reads2"), "--reads");
-        assert_eq!(normalize_arg("-abund3"), "--abund");
-        assert_eq!(normalize_arg("-reads_list"), "--reads-list");
-        assert_eq!(normalize_arg("-abund_list"), "--abund-list");
-        assert_eq!(normalize_arg("filter"), "filter");
-    }
-
-    #[test]
-    fn preprocess_inserts_pipeline() {
-        assert_eq!(
-            preprocess_args(&args(&["-contig", "c.fa", "-out", "o"]))[0],
-            "pipeline"
-        );
-    }
-
-    #[test]
-    fn preprocess_preserves_subcommand() {
-        assert_eq!(
-            preprocess_args(&args(&["filter", "-contig", "c.fa", "-out", "o"]))[0],
-            "filter"
-        );
-    }
-
-    #[test]
-    fn preprocess_version_no_pipeline() {
-        for flag in ["-version", "--version", "-v"] {
-            assert_eq!(
-                preprocess_args(&[flag.to_string()]),
-                vec!["--version"],
-                "flag: {flag}"
-            );
-        }
+        assert_eq!(cli.abund.len(), 2);
     }
 
     #[test]
     fn default_prob_threshold() {
-        let Command::Pipeline(cli) =
-            parse_from(&args(&["-contig", "c.fa", "-reads", "r.fq", "-out", "o"]))
-        else {
+        let Command::Pipeline(cli) = parse_from(&args(&[
+            "--contig", "c.fa", "--reads", "r.fq", "--out", "o",
+        ])) else {
             panic!("Expected Pipeline")
         };
         assert_eq!(cli.prob_threshold(), 0.9);
     }
 
     #[test]
-    fn parse_filter_subcommand() {
-        let Command::Filter(a) = parse_from(&args(&[
-            "filter",
-            "-contig",
-            "input.fa.gz",
-            "-out",
-            "prefix",
-            "-min_contig_length",
-            "500",
-        ])) else {
-            panic!("Expected Filter")
-        };
-        assert_eq!(a.contig, PathBuf::from("input.fa.gz"));
-        assert_eq!(a.out, "prefix");
-        assert_eq!(a.min_contig_length, 500);
-    }
-
-    #[test]
-    fn parse_seeds_subcommand() {
-        let Command::Seeds(a) = parse_from(&args(&[
-            "seeds",
-            "-contig",
-            "filtered.fa",
-            "-hmmout",
-            "hits.txt",
-            "-out",
-            "prefix",
-        ])) else {
-            panic!("Expected Seeds")
-        };
-        assert_eq!(a.contig, PathBuf::from("filtered.fa"));
-        assert_eq!(a.hmmout, PathBuf::from("hits.txt"));
-        assert_eq!(a.out, "prefix");
-    }
-
-    #[test]
-    fn parse_em_subcommand() {
-        let Command::Em(a) = parse_from(&args(&[
-            "em",
-            "-contig",
-            "filtered.fa",
-            "-abund",
-            "depth.txt",
-            "-seed",
-            "seeds.txt",
-            "-out",
-            "prefix",
-            "-thread",
-            "4",
-        ])) else {
-            panic!("Expected Em")
-        };
-        assert_eq!(a.contig, PathBuf::from("filtered.fa"));
-        assert_eq!(a.abund.len(), 1);
-        assert_eq!(a.seed, PathBuf::from("seeds.txt"));
-        assert_eq!(a.out, "prefix");
-        assert_eq!(a.thread, 4);
-    }
-
-    #[test]
-    fn parse_cpp_em_subcommand() {
-        let Command::CppEm(a) = parse_from(&args(&[
-            "cpp-em", "-contig", "f.fa", "-abund", "d.txt", "-seed", "s.txt", "-out", "o",
-        ])) else {
-            panic!("Expected CppEm")
-        };
-        assert_eq!(a.contig, PathBuf::from("f.fa"));
-        assert_eq!(a.abund, PathBuf::from("d.txt"));
-        assert_eq!(a.seed, PathBuf::from("s.txt"));
-        assert_eq!(a.out, "o");
-    }
-
-    #[test]
-    fn parse_sam_to_abund_subcommand() {
-        let Command::SamToAbund(a) = parse_from(&args(&[
-            "sam-to-abund",
-            "-sam",
-            "input.sam",
-            "-out",
-            "output.txt",
-        ])) else {
-            panic!("Expected SamToAbund")
-        };
-        assert_eq!(a.sam, PathBuf::from("input.sam"));
-        assert_eq!(a.out, PathBuf::from("output.txt"));
-    }
-
-    #[test]
-    fn parse_explicit_pipeline_subcommand() {
-        let Command::Pipeline(cli) = parse_from(&args(&[
-            "pipeline", "-contig", "c.fa", "-reads", "r.fq", "-out", "o",
-        ])) else {
-            panic!("Expected Pipeline")
-        };
-        assert_eq!(cli.contig, PathBuf::from("c.fa"));
-        assert_eq!(cli.reads.len(), 1);
-        assert_eq!(cli.out, "o");
-    }
-
-    #[test]
-    fn legacy_flags_become_pipeline() {
-        assert!(matches!(
-            parse_from(&args(&["-contig", "c.fa", "-abund", "a.txt", "-out", "o"])),
-            Command::Pipeline(_)
-        ));
-    }
-
-    #[test]
     fn em_default_prob_threshold() {
         let Command::Em(a) = parse_from(&args(&[
-            "em", "-contig", "c.fa", "-abund", "a.txt", "-seed", "s.txt", "-out", "o",
+            "em", "--contig", "c.fa", "--abund", "a.txt", "--seed", "s.txt", "--out", "o",
         ])) else {
             panic!("Expected Em")
         };
         assert_eq!(a.prob_threshold(), 0.9);
-    }
-
-    #[test]
-    fn parse_underscore_subcommand_aliases() {
-        assert!(matches!(
-            parse_from(&args(&[
-                "cpp_em", "-contig", "f.fa", "-abund", "d.txt", "-seed", "s.txt", "-out", "o",
-            ])),
-            Command::CppEm(_)
-        ));
-        assert!(matches!(
-            parse_from(&args(&["sam_to_abund", "-sam", "i.sam", "-out", "o.txt"])),
-            Command::SamToAbund(_)
-        ));
     }
 }

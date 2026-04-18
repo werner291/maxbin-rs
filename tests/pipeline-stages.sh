@@ -164,7 +164,7 @@ STAGE1_START=$SECONDS
 
 STAGE1_DIR=$(mktemp -d)
 # Subcommand: just filter, nothing else.
-maxbin-rs filter -contig "$MAXBIN2_TEST_CONTIGS" -out "$STAGE1_DIR/test"
+maxbin-rs filter --contig "$MAXBIN2_TEST_CONTIGS" -out "$STAGE1_DIR/test"
 
 # Save the filtered contigs for later stages — avoids re-decompressing
 # the (potentially very large) contig file for stages 3 and 4.
@@ -265,7 +265,7 @@ STAGE3_START=$SECONDS
 RUST_DIR=$(mktemp -d)
 # Subcommand: just generate seeds from HMMER output. Uses the filtered
 # contigs from Stage 1 (no decompression needed).
-maxbin-rs seeds -contig "$FILTERED_CONTIGS" -hmmout "$ORIG_HMMOUT" -out "$RUST_DIR/test"
+maxbin-rs seeds --contig "$FILTERED_CONTIGS" -hmmout "$ORIG_HMMOUT" -out "$RUST_DIR/test"
 
 RUST_SEED="$RUST_DIR/test.seed"
 if [ -f "$RUST_SEED" ]; then
@@ -309,11 +309,11 @@ CPP_DIR=$(mktemp -d)
 RUST_DIR=$(mktemp -d)
 
 # Subcommands: run C++ EM and Rust EM separately. Each reports its own timing.
-maxbin-rs cpp-em -contig "$FILTERED_CONTIGS" -abund "$ORIG_ABUND" \
-  -seed "$ORIG_SEED" -out "$CPP_DIR/test" -thread 1
+maxbin-rs cpp-em --contig "$FILTERED_CONTIGS" -abund "$ORIG_ABUND" \
+  --seed "$ORIG_SEED" -out "$CPP_DIR/test" -thread 1
 
-maxbin-rs em -contig "$FILTERED_CONTIGS" -abund "$ORIG_ABUND" \
-  -seed "$ORIG_SEED" -out "$RUST_DIR/test" -thread 1
+maxbin-rs em --contig "$FILTERED_CONTIGS" -abund "$ORIG_ABUND" \
+  --seed "$ORIG_SEED" -out "$RUST_DIR/test" -thread 1
 
 # Compare outputs.
 echo ""

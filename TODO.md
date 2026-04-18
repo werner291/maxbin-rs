@@ -44,6 +44,11 @@ lack of ongoing maintenance rather than poor original engineering.
 - **`long double` vs `f64` precision gap** — inherent ~2.5 decimal digit
   difference. Affects a small number of contigs at decision boundaries.
   Cannot fix without 80-bit floats in Rust.
+- **Noclass file assembly order** — on full CAMI I High (42k contigs),
+  the noclass file differs from the original despite containing the same
+  contigs. All 253 bins are byte-identical. The difference is in how
+  noclass files from recursive EM rounds are merged. No pipeline parses
+  noclass internals.
 - **Summary formatting** — minor differences in "Bins without sequences"
   counter and `%0.4Lf` vs `{:.4}` rounding. Cosmetic, doesn't affect bins.
 - `-verbose` and `-plotmarker` accepted but ignored
