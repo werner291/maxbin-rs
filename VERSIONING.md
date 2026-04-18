@@ -25,14 +25,17 @@ Allowed changes:
 Not allowed:
 - Anything that changes bin assignments on the same input
 
-### v0.2.x — Correctness fixes
+### v0.2.x — Corrected defaults, obvious bug fixes
 
-Fixes behavioral bugs in the original that change output:
-- `prob_threshold` default (0.5 in code vs 0.9 in docs)
-- Duplicate contigs across bins
-- Other correctness issues documented in TODO.md
+Same algorithm, but with corrected defaults and fixed obvious bugs.
+A user can recover v0.1 behavior by passing the original's flags
+explicitly (e.g. `-prob_threshold 0.5`).
 
-Each change is documented in the changelog with before/after impact.
+Changes so far:
+- `prob_threshold` default: 0.5 → 0.9 (matching the documented value)
+
+Each breaking change is documented with motivation — why the old
+behavior was wrong, not just what changed.
 
 ### v0.3+ — New features
 
