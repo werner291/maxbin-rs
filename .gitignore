@@ -4,3 +4,7 @@
 
 # MaxBin2 drops temp log files with random numeric names in cwd
 [0-9]*.log
+
+# Pipeline intermediates (--keep-intermediates)
+/intermediates/
+/output/

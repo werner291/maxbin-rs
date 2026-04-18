@@ -107,8 +107,9 @@ pub struct EmArgs {
 pub struct PipelineArgs {
     #[arg(long)]
     pub contig: PathBuf,
+    /// Output directory for final results (default: ./output/).
     #[arg(long)]
-    pub out: String,
+    pub out: Option<PathBuf>,
     #[arg(long, action = ArgAction::Append)]
     pub abund: Vec<PathBuf>,
     #[arg(long)]
@@ -125,7 +126,7 @@ pub struct PipelineArgs {
     pub thread: usize,
     /// Probability threshold for EM final classification (default: 0.9).
     /// Note: the original code defaults to 0.5 but the help text says 0.9.
-    /// We use 0.9 (the documented value). Use -prob_threshold 0.5 for
+    /// We use 0.9 (the documented value). Use --prob-threshold 0.5 for
     /// bug-for-bug compatibility with the original.
     #[arg(long)]
     pub prob_threshold: Option<f64>,
@@ -139,11 +140,20 @@ pub struct PipelineArgs {
     pub plotmarker: bool,
     #[arg(long)]
     pub verbose: bool,
-    #[arg(long)]
-    pub preserve_intermediate: bool,
     /// Pre-computed HMMER output — skips gene calling and HMMER when provided.
     #[arg(long)]
     pub hmmout: Option<PathBuf>,
+    /// Allow writing into a non-empty output directory.
+    #[arg(long)]
+    pub force_overwrite: bool,
+    /// Keep intermediate files after pipeline completes.
+    /// Without --work-dir, intermediates go to ./intermediates/maxbin-rs-<id>/.
+    #[arg(long)]
+    pub keep_intermediates: bool,
+    /// Parent directory for intermediate files (default: $TMPDIR when not
+    /// keeping, ./intermediates/ when --keep-intermediates).
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -237,6 +247,14 @@ impl PipelineArgs {
         effective_prob_threshold(self.prob_threshold)
     }
 
+    pub fn output_dir(&self) -> crate::paths::OutputDir {
+        crate::paths::OutputDir::new(self.out.clone())
+    }
+
+    pub fn work_dir(&self) -> Result<crate::paths::WorkDir, String> {
+        crate::paths::WorkDir::new(self.keep_intermediates, self.work_dir.as_deref())
+    }
+
     pub fn all_abund_files(&self) -> std::io::Result<Vec<PathBuf>> {
         expand_file_list(&self.abund, self.abund_list.as_ref())
     }
@@ -302,18 +320,28 @@ mod tests {
 
     #[test]
     fn implicit_pipeline_subcommand() {
-        let Command::Pipeline(cli) = parse_from(&args(&[
-            "--contig", "c.fa", "--reads", "r.fq", "--out", "o",
-        ])) else {
+        let Command::Pipeline(cli) = parse_from(&args(&["--contig", "c.fa", "--reads", "r.fq"]))
+        else {
             panic!("Expected Pipeline")
         };
         assert_eq!(cli.contig, PathBuf::from("c.fa"));
+        assert_eq!(cli.out, None);
+    }
+
+    #[test]
+    fn explicit_out_dir() {
+        let Command::Pipeline(cli) = parse_from(&args(&[
+            "--contig", "c.fa", "--reads", "r.fq", "--out", "mydir",
+        ])) else {
+            panic!("Expected Pipeline")
+        };
+        assert_eq!(cli.out, Some(PathBuf::from("mydir")));
     }
 
     #[test]
     fn multiple_abund_flags() {
         let Command::Pipeline(cli) = parse_from(&args(&[
-            "--contig", "c.fa", "--abund", "a1.txt", "--abund", "a2.txt", "--out", "o",
+            "--contig", "c.fa", "--abund", "a1.txt", "--abund", "a2.txt",
         ])) else {
             panic!("Expected Pipeline")
         };
@@ -322,9 +350,8 @@ mod tests {
 
     #[test]
     fn default_prob_threshold() {
-        let Command::Pipeline(cli) = parse_from(&args(&[
-            "--contig", "c.fa", "--reads", "r.fq", "--out", "o",
-        ])) else {
+        let Command::Pipeline(cli) = parse_from(&args(&["--contig", "c.fa", "--reads", "r.fq"]))
+        else {
             panic!("Expected Pipeline")
         };
         assert_eq!(cli.prob_threshold(), 0.9);

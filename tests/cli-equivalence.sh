@@ -103,27 +103,18 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --abund "$ABUND" --out "$RUST/out" --thread 1 \
   2> "$RUST/stderr.log" || true
 
-compare_bins "$ORIG" "$RUST" "1.1 bins"
+compare_bins "$ORIG" "$RUST/out" "1.1 bins"
 
 # Compare noclass
-if [ -f "$ORIG/test.noclass" ] && [ -f "$RUST/test.noclass" ]; then
-  compare_files "$ORIG/test.noclass" "$RUST/test.noclass" "1.2 noclass"
-elif [ ! -f "$ORIG/test.noclass" ] && [ ! -f "$RUST/test.noclass" ]; then
+if [ -f "$ORIG/test.noclass" ] && [ -f "$RUST/out/noclass" ]; then
+  compare_files "$ORIG/test.noclass" "$RUST/out/noclass" "1.2 noclass"
+elif [ ! -f "$ORIG/test.noclass" ] && [ ! -f "$RUST/out/noclass" ]; then
   pass "1.2 noclass (both absent)"
 else
   fail "1.2 noclass (one present, one absent)"
-fi
-
-# Compare tooshort
-if [ -f "$ORIG/test.tooshort" ] && [ -f "$RUST/test.tooshort" ]; then
-  compare_files "$ORIG/test.tooshort" "$RUST/test.tooshort" "1.3 tooshort"
-elif [ ! -f "$ORIG/test.tooshort" ] && [ ! -f "$RUST/test.tooshort" ]; then
-  pass "1.3 tooshort (both absent)"
-else
-  fail "1.3 tooshort (one present, one absent)"
 fi
 
 echo ""
@@ -145,11 +136,11 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --abund "$ABUND" --out "$RUST/out" --thread 1 \
   --min-contig-length 500 \
   2> "$RUST/stderr.log" || true
 
-compare_bins "$ORIG" "$RUST" "2.1 bins (min_contig_length=500)"
+compare_bins "$ORIG" "$RUST/out" "2.1 bins (min_contig_length=500)"
 
 echo ""
 
@@ -170,14 +161,14 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --abund "$ABUND" --out "$RUST/out" --thread 1 \
   --prob-threshold 0.5 \
   2> "$RUST/stderr.log" || true
 
-compare_bins "$ORIG" "$RUST" "3.1 bins (prob_threshold=0.5)"
+compare_bins "$ORIG" "$RUST/out" "3.1 bins (prob_threshold=0.5)"
 
-if [ -f "$ORIG/test.noclass" ] && [ -f "$RUST/test.noclass" ]; then
-  compare_files "$ORIG/test.noclass" "$RUST/test.noclass" "3.2 noclass (prob_threshold=0.5)"
+if [ -f "$ORIG/test.noclass" ] && [ -f "$RUST/out/noclass" ]; then
+  compare_files "$ORIG/test.noclass" "$RUST/out/noclass" "3.2 noclass (prob_threshold=0.5)"
 fi
 
 echo ""
@@ -199,12 +190,12 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --abund "$ABUND" --out "$RUST/out" --thread 1 \
   --markerset 40 \
   2>&1 || true
-echo "  maxbin-rs output files: $(ls "$RUST"/test.* 2>/dev/null || echo '(none)')"
+echo "  maxbin-rs output files: $(ls "$RUST/out/" 2>/dev/null || echo '(none)')"
 
-compare_bins "$ORIG" "$RUST" "4.1 bins (markerset=40)"
+compare_bins "$ORIG" "$RUST/out" "4.1 bins (markerset=40)"
 
 echo ""
 
@@ -230,10 +221,10 @@ if [ -n "${READS1:-}" ]; then
   echo "  Running maxbin-rs..."
   maxbin-rs --contig "$CONTIGS" \
     --reads "$READS1" \
-    --out "$RUST/test" --thread 1 \
+    --out "$RUST/out" --thread 1 \
     2> "$RUST/stderr.log" || true
 
-  compare_bins "$ORIG" "$RUST" "5.1 bins (reads mode)"
+  compare_bins "$ORIG" "$RUST/out" "5.1 bins (reads mode)"
 else
   skip "5.x reads mode (no READS1)"
 fi
@@ -257,11 +248,11 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --abund "$ABUND" --out "$RUST/out" --thread 1 \
   --max-iteration 1 \
   2> "$RUST/stderr.log" || true
 
-compare_bins "$ORIG" "$RUST" "6.1 bins (max_iteration=1)"
+compare_bins "$ORIG" "$RUST/out" "6.1 bins (max_iteration=1)"
 
 echo ""
 

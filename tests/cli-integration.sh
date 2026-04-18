@@ -352,58 +352,73 @@ echo ""
 # =========================================================================
 # 7. Legacy (no subcommand) mode with abundance
 # =========================================================================
-echo "--- 7. Legacy mode ---"
+echo "--- 7. Pipeline mode ---"
 
-D="$WORK/legacy"
+D="$WORK/pipeline"
 
-# 7.1 basic with --abund (skips Bowtie2)
-mkdir -p "$D/abund"
-assert_exit_code "7.1 legacy-abund" 0 \
-  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/abund/test"
-assert_file_exists "$D/abund/test.summary" "7.1 summary"
+# 7.1 basic with --abund (skips Bowtie2), default output dir
+assert_exit_code "7.1 pipeline-abund" 0 \
+  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/abund"
+assert_file_exists "$D/abund/summary" "7.1 summary"
 
 # 7.2 explicit pipeline subcommand (same thing)
-mkdir -p "$D/explicit"
-maxbin-rs pipeline --contig "$CONTIGS" --abund "$ABUND" --out "$D/explicit/test" 2>/dev/null
-assert_files_identical "$D/abund/test.summary" "$D/explicit/test.summary" \
+assert_exit_code "7.2 explicit-pipeline" 0 \
+  maxbin-rs pipeline --contig "$CONTIGS" --abund "$ABUND" --out "$D/explicit"
+assert_files_identical "$D/abund/summary" "$D/explicit/summary" \
   "7.2 explicit pipeline == legacy"
 
 # 7.3 error cases
-assert_exit_code "7.3 legacy-missing-contig" 1 maxbin-rs --reads "$CONTIGS" --out prefix
-assert_exit_code "7.4 legacy-missing-out" 1 maxbin-rs --contig "$CONTIGS" --abund "$ABUND"
-assert_exit_code "7.5 legacy-no-reads-no-abund" 1 maxbin-rs --contig "$CONTIGS" --out prefix
+assert_exit_code "7.3 pipeline-missing-contig" 1 maxbin-rs --reads "$CONTIGS"
+assert_exit_code "7.5 pipeline-no-reads-no-abund" 1 maxbin-rs --contig "$CONTIGS"
 
-# 7.4 preserve_intermediate
-mkdir -p "$D/preserve"
-maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/preserve/test" \
-  --preserve-intermediate 2>/dev/null
-assert_file_exists "$D/preserve/test.seed" "7.6 preserve_intermediate keeps seed"
-assert_file_exists "$D/preserve/test.contig.tmp" "7.6 preserve_intermediate keeps contig.tmp"
+# 7.4 non-empty output dir should fail
+mkdir -p "$D/nonempty"
+touch "$D/nonempty/dummy"
+assert_exit_code "7.4 nonempty-out-fails" 1 \
+  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/nonempty"
 
-# 7.5 verbose (just check it doesn't crash)
-mkdir -p "$D/verbose"
-assert_exit_code "7.7 verbose-flag" 0 \
-  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/verbose/test" --verbose
+# 7.4b force-overwrite allows non-empty output dir
+assert_exit_code "7.4b force-overwrite" 0 \
+  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/nonempty" --force-overwrite
 
-# 7.6 multiple reads files
-if [ -n "${READS1:-}" ] && [ -n "${READS2:-}" ]; then
-  mkdir -p "$D/multi_reads"
-  assert_exit_code "7.8 legacy-multi-reads" 0 \
-    maxbin-rs --contig "$CONTIGS" --reads "$READS1" --reads "$READS2" --out "$D/multi_reads/test"
-  assert_file_exists "$D/multi_reads/test.summary" "7.8 summary"
+# 7.5 keep-intermediates
+assert_exit_code "7.5 keep-intermediates" 0 \
+  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/keepint" --keep-intermediates
+# Intermediates dir should exist somewhere under ./intermediates/
+INTDIR=$(find "$D/keepint/../" -path "*/intermediates/maxbin-rs-*" -type d 2>/dev/null | head -1)
+if [ -z "$INTDIR" ]; then
+  # Check cwd-relative intermediates dir
+  INTDIR=$(find . -path "./intermediates/maxbin-rs-*" -type d 2>/dev/null | head -1)
+fi
+if [ -n "$INTDIR" ]; then
+  pass "7.5 intermediates dir preserved"
+  rm -rf "$INTDIR"
 else
-  skip "7.8 legacy-multi-reads (no READS2)"
+  fail "7.5 intermediates dir not found"
 fi
 
-# 7.7 reads_list
+# 7.6 verbose (just check it doesn't crash)
+assert_exit_code "7.6 verbose-flag" 0 \
+  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/verbose" --verbose
+
+# 7.7 multiple reads files
+if [ -n "${READS1:-}" ] && [ -n "${READS2:-}" ]; then
+  assert_exit_code "7.7 pipeline-multi-reads" 0 \
+    maxbin-rs --contig "$CONTIGS" --reads "$READS1" --reads "$READS2" --out "$D/multi_reads"
+  assert_file_exists "$D/multi_reads/summary" "7.7 summary"
+else
+  skip "7.7 pipeline-multi-reads (no READS2)"
+fi
+
+# 7.8 reads_list
 if [ -n "${READS1:-}" ]; then
   mkdir -p "$D/reads_list"
   echo "$READS1" > "$D/reads_list/list.txt"
-  assert_exit_code "7.9 legacy-reads-list" 0 \
-    maxbin-rs --contig "$CONTIGS" --reads-list "$D/reads_list/list.txt" --out "$D/reads_list/test"
-  assert_file_exists "$D/reads_list/test.summary" "7.9 summary"
+  assert_exit_code "7.8 pipeline-reads-list" 0 \
+    maxbin-rs --contig "$CONTIGS" --reads-list "$D/reads_list/list.txt" --out "$D/reads_list_out"
+  assert_file_exists "$D/reads_list_out/summary" "7.8 summary"
 else
-  skip "7.9 legacy-reads-list (no READS1)"
+  skip "7.8 pipeline-reads-list (no READS1)"
 fi
 
 echo ""

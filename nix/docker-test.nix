@@ -55,8 +55,8 @@ pkgs.testers.runNixOSTest {
     )
     print(result)
 
-    # Verify output bins were created
-    machine.succeed("ls /tmp/output/bins.*.fasta")
-    machine.succeed("test -f /tmp/output/bins.summary")
+    # Verify output bins were created in the output directory
+    machine.succeed("ls /tmp/output/bins/*.fasta")
+    machine.succeed("test -f /tmp/output/bins/summary")
   '';
 }

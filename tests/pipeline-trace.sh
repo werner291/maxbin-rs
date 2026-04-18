@@ -32,7 +32,9 @@ bin_table() {
   printf "  %-40s %8s %12s\n" "bin" "contigs" "bp"
   printf "  %-40s %8s %12s\n" "---" "-------" "--"
   local total_contigs=0 total_bp=0 n_bins=0
-  for f in "$dir"/${prefix}.*.fasta; do
+  local glob
+  if [ -n "$prefix" ]; then glob="$dir/${prefix}.*.fasta"; else glob="$dir/*.fasta"; fi
+  for f in $glob; do
     [ -f "$f" ] || continue
     local name
     name=$(basename "$f")
@@ -47,17 +49,26 @@ bin_table() {
   echo ""
   printf "  total: %d bins, %d contigs, %d bp\n" "$n_bins" "$total_contigs" "$total_bp"
 
-  if [ -f "$dir/${prefix}.noclass" ]; then
+  local noclass tooshort
+  if [ -n "$prefix" ]; then
+    noclass="$dir/${prefix}.noclass"
+    tooshort="$dir/${prefix}.tooshort"
+  else
+    noclass="$dir/noclass"
+    tooshort="$dir/tooshort"
+  fi
+
+  if [ -f "$noclass" ]; then
     local nc_contigs nc_bp
-    nc_contigs=$(grep -c '^>' "$dir/${prefix}.noclass")
-    nc_bp=$(grep -v '^>' "$dir/${prefix}.noclass" | tr -d '\n' | wc -c)
+    nc_contigs=$(grep -c '^>' "$noclass")
+    nc_bp=$(grep -v '^>' "$noclass" | tr -d '\n' | wc -c)
     printf "  noclass: %d contigs, %d bp\n" "$nc_contigs" "$nc_bp"
   fi
 
-  if [ -f "$dir/${prefix}.tooshort" ]; then
+  if [ -f "$tooshort" ]; then
     local ts_contigs ts_bp
-    ts_contigs=$(grep -c '^>' "$dir/${prefix}.tooshort")
-    ts_bp=$(grep -v '^>' "$dir/${prefix}.tooshort" | tr -d '\n' | wc -c)
+    ts_contigs=$(grep -c '^>' "$tooshort")
+    ts_bp=$(grep -v '^>' "$tooshort" | tr -d '\n' | wc -c)
     printf "  tooshort: %d contigs, %d bp\n" "$ts_contigs" "$ts_bp"
   fi
 }
@@ -102,7 +113,7 @@ mkdir -p "$RUST"
 echo "--- Running maxbin-rs ---"
 RUST_START=$SECONDS
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" --hmmout "$HMMOUT" --out "$RUST/test" --thread 1 \
+  --abund "$ABUND" --hmmout "$HMMOUT" --out "$RUST/out" --thread 1 \
   2>&1 | grep --line-buffered -v -E 'candidate: marker=|^  seed: |EM iteration [0-9]|no seeds .* skipping|median ≤ 1' | sed -u 's/^/  rust│ /'
 RUST_ELAPSED=$((SECONDS - RUST_START))
 echo ""
@@ -120,19 +131,20 @@ echo ""
 echo "==========================================="
 echo "  maxbin-rs — final bins"
 echo "==========================================="
-bin_table "$RUST" "test"
+bin_table "$RUST/out" ""
 
 echo ""
 
-for tool_dir in "$ORIG" "$RUST"; do
-  label="original"
-  [ "$tool_dir" = "$RUST" ] && label="maxbin-rs"
-  if [ -f "$tool_dir/test.summary" ]; then
-    echo "--- $label summary ---"
-    sed 's/^/  /' "$tool_dir/test.summary"
-    echo ""
-  fi
-done
+if [ -f "$ORIG/test.summary" ]; then
+  echo "--- original summary ---"
+  sed 's/^/  /' "$ORIG/test.summary"
+  echo ""
+fi
+if [ -f "$RUST/out/summary" ]; then
+  echo "--- maxbin-rs summary ---"
+  sed 's/^/  /' "$RUST/out/summary"
+  echo ""
+fi
 
 echo "--- timing ---"
 printf "  original: %dm%02ds\n" $((ORIG_ELAPSED / 60)) $((ORIG_ELAPSED % 60))
@@ -146,7 +158,7 @@ VERDICT="PASS"
 
 # Check each bin by sorted hash (bin numbering may differ)
 ORIG_HASHES=$(for f in "$ORIG"/test.*.fasta; do [ -f "$f" ] && sha256sum "$f" | cut -d' ' -f1; done | sort)
-RUST_HASHES=$(for f in "$RUST"/test.*.fasta; do [ -f "$f" ] && sha256sum "$f" | cut -d' ' -f1; done | sort)
+RUST_HASHES=$(for f in "$RUST/out"/*.fasta; do [ -f "$f" ] && sha256sum "$f" | cut -d' ' -f1; done | sort)
 
 if [ "$ORIG_HASHES" != "$RUST_HASHES" ]; then
   echo "FAIL: bin hashes differ"
@@ -163,7 +175,7 @@ if [ "$ORIG_HASHES" != "$RUST_HASHES" ]; then
     h=$(sha256sum "$f" | cut -d' ' -f1)
     if echo "$RUST_ONLY" | grep -q . && ! echo "$RUST_HASHES" | grep -q "$h"; then
       bname=$(basename "$f")
-      rf="$RUST/$bname"
+      rf="$RUST/out/$bname"
       if [ -f "$rf" ]; then
         echo "  --- $bname headers diff ---"
         diff <(grep '^>' "$f" | sort) <(grep '^>' "$rf" | sort) | head -10
@@ -174,10 +186,10 @@ if [ "$ORIG_HASHES" != "$RUST_HASHES" ]; then
 fi
 
 # Check noclass
-if ! diff -q "$ORIG/test.noclass" "$RUST/test.noclass" > /dev/null 2>&1; then
+if ! diff -q "$ORIG/test.noclass" "$RUST/out/noclass" > /dev/null 2>&1; then
   echo "FAIL: noclass differs"
-  echo "  file sizes: orig=$(wc -c < "$ORIG/test.noclass") rust=$(wc -c < "$RUST/test.noclass")"
-  diff <(grep '^>' "$ORIG/test.noclass") <(grep '^>' "$RUST/test.noclass") | head -20
+  echo "  file sizes: orig=$(wc -c < "$ORIG/test.noclass") rust=$(wc -c < "$RUST/out/noclass")"
+  diff <(grep '^>' "$ORIG/test.noclass") <(grep '^>' "$RUST/out/noclass") | head -20
   VERDICT="FAIL"
 fi
 

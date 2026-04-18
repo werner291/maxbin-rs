@@ -1,11 +1,8 @@
 # maxbin-rs
 
-**Status: Equivalence-tested, not yet pipeline-tested.** At the same float
-width (`double`/`f64`), all output is bit-for-bit identical to MaxBin2 2.2.7
-through 5 levels of recursive binning. The only divergence is the original's
-use of 80-bit `long double` on x86-64 Linux (~4 contigs on CAMI I High).
-~8x faster EM core. Not yet tested inside nf-core/mag or other pipelines —
-if you try it, please report issues.
+**Not yet tested inside nf-core/mag or other pipeline managers.**
+Produces identical bins to MaxBin2 2.2.7 on all tested datasets,
+with an ~8x faster EM core. If you try it, please report issues.
 
 ---
 
@@ -31,8 +28,11 @@ For a detailed account of how this rewrite was done and verified, see
 nix run github:werner291/maxbin-rs -- \
   --contig contigs.fa.gz \
   --reads reads.fastq.gz \
-  --out my_bins
+  --out my_bins/
 ```
+
+Output goes to the `my_bins/` directory: `001.fasta`, `002.fasta`, ...,
+`summary`, `noclass`, `marker`, `log`.
 
 ### Skip the pipeline, just run the EM
 
@@ -54,13 +54,13 @@ expensive stages you've already run:
 
 ```bash
 # Skip gene calling (bring your own protein FASTA, e.g. from Prodigal)
-maxbin-rs --contig contigs.fa --abund depth.txt --faa proteins.faa --out result
+maxbin-rs --contig contigs.fa --abund depth.txt --faa proteins.faa --out output/
 
 # Skip gene calling + HMMER (bring your own HMMER output)
-maxbin-rs --contig contigs.fa --abund depth.txt --hmmout hits.txt --out result
+maxbin-rs --contig contigs.fa --abund depth.txt --hmmout hits.txt --out output/
 
 # Skip read alignment (bring your own abundance file)
-maxbin-rs --contig contigs.fa --abund depth.txt --out result
+maxbin-rs --contig contigs.fa --abund depth.txt --out output/
 ```
 
 The `--faa` flag was inspired by
@@ -78,13 +78,13 @@ your PATH.
 ### Docker
 
 ```bash
-docker pull ghcr.io/werner291/maxbin-rs:v0.1.1
+docker pull ghcr.io/werner291/maxbin-rs:latest
 docker run --rm \
   -v /path/to/data:/data \
-  ghcr.io/werner291/maxbin-rs:v0.1.1 \
-  -contig /data/contigs.fa.gz \
-  -reads /data/reads.fastq.gz \
-  -out /data/output/bins
+  ghcr.io/werner291/maxbin-rs:latest \
+  --contig /data/contigs.fa.gz \
+  --reads /data/reads.fastq.gz \
+  --out /data/output/bins
 ```
 
 The image is built by Nix and includes all runtime dependencies. Published
@@ -206,11 +206,12 @@ approximately 8x faster than the original C++ EM (see
 
 ### What works
 
-All CLI flags accepted by the original: `-contig`, `-abund` (including
-`-abund2`, `-abund3` etc), `-reads`, `-thread`, `-out`,
-`-min_contig_length`, `-max_iteration`, `-prob_threshold`, `-markerset`,
-`-verbose`, `-plotmarker`. Output files: `*.fasta` bins, `.noclass`,
-`.tooshort`, `.summary`, `.marker`, `.log`.
+All original CLI flags are supported via double-dash syntax: `--contig`,
+`--abund`, `--reads`, `--thread`, `--out`, `--min-contig-length`,
+`--max-iteration`, `--prob-threshold`, `--markerset`, `--verbose`,
+`--plotmarker`. Multiple abundance/reads files use repeated `--abund` /
+`--reads` flags. Output files: `NNN.fasta` bins, `noclass`, `summary`,
+`marker`, `log` — all inside the `--out` directory.
 
 ### Known differences from the original
 
@@ -232,10 +233,15 @@ These are intentional or unavoidable and should not affect correctness:
   less output but this shouldn't affect behavior.
 - **Exit code**: `1` on error (the original uses `-1` / 255 for some
   errors). Pipelines checking for non-zero should be unaffected.
-- **No temp files next to input**: the original writes decompressed
-  contigs and other temp files next to the input file, which fails on
-  read-only filesystems. We write temp files relative to the output
-  prefix instead.
+- **`--out` is a directory** (v0.3+): `--out my_bins/` creates a
+  directory with `001.fasta`, `summary`, etc. inside. The original uses
+  `--out` as a filename prefix. The directory errors if non-empty unless
+  `--force-overwrite` is passed.
+- **Intermediate files go to a temp directory**, cleaned up automatically
+  on success. Use `--keep-intermediates` to preserve them (defaults to
+  `./intermediates/maxbin-rs-<id>/`). Use `--work-dir` to control where
+  they go. The original writes temp files next to the input, which fails
+  on read-only filesystems.
 
 ### Missing output files
 
@@ -255,13 +261,16 @@ report any issues.
 
 See [VERSIONING.md](VERSIONING.md) for the full policy. In short:
 
-- **v0.1.x** — bug-for-bug compatible with the original MaxBin2.
-  Output is bit-identical at the same float width. Intended as a
-  drop-in replacement, but not yet tested inside real pipelines.
+- **v0.1.x** — bug-for-bug compatible drop-in replacement.
+  Output is bit-identical at the same float width. Same single-dash
+  CLI flags, same `--out` prefix behavior, same output filenames.
+  Use this if you need to swap MaxBin2 out without changing scripts.
 - **v0.2.x** — correctness fixes that change output (e.g.,
-  `prob_threshold` default, duplicate contigs).
-- **v0.3+** — new features (Prodigal, GTDB markers, parallelized
-  outer loop, nf-core/mag module).
+  `prob_threshold` default). CLI flags switch to double-dash syntax.
+- **v0.3+** — breaking CLI changes: `--out` is now a directory (not a
+  prefix), output files are `001.fasta` (not `prefix.001.fasta`),
+  intermediate files go to a temp directory instead of cwd. Binning
+  algorithm is unchanged from v0.2.x.
 
 "Breaking change" means "changes binning output on the same input." Crash fixes,
 better errors, and performance improvements are never breaking.

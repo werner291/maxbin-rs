@@ -14,30 +14,26 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Filter contigs by minimum length.
-/// Returns (filtered_path, tooshort_path) where filtered_path contains only
-/// contigs >= min_length.
 ///
 /// Matches run_MaxBin.pl:366 (checkContig() call): splits contigs into
-/// "$out_f.contig.tmp" and "$out_f.tooshort" based on minimum length.
+/// filtered and too-short files based on minimum length.
 /// Unlike the original, we don't write temp files next to the input
 /// (KNOWN ISSUE: the original writes next to the contig file, failing on
 /// read-only filesystems).
 pub fn filter_contigs(
     contig: &Path,
-    out_prefix: &str,
+    filtered_path: &Path,
+    tooshort_path: &Path,
     min_length: usize,
-) -> Result<(PathBuf, PathBuf), String> {
+) -> Result<(), String> {
     use std::io::BufRead;
 
-    let filtered_path = PathBuf::from(format!("{out_prefix}.contig.tmp"));
-    let tooshort_path = PathBuf::from(format!("{out_prefix}.tooshort"));
-
     let mut filtered = std::io::BufWriter::new(
-        std::fs::File::create(&filtered_path)
+        std::fs::File::create(filtered_path)
             .map_err(|e| format!("Can't create {}: {e}", filtered_path.display()))?,
     );
     let mut tooshort = std::io::BufWriter::new(
-        std::fs::File::create(&tooshort_path)
+        std::fs::File::create(tooshort_path)
             .map_err(|e| format!("Can't create {}: {e}", tooshort_path.display()))?,
     );
 
@@ -107,7 +103,7 @@ pub fn filter_contigs(
         n_filtered, n_tooshort
     );
 
-    Ok((filtered_path, tooshort_path))
+    Ok(())
 }
 
 /// Compute abundance from a SAM file.
@@ -246,7 +242,9 @@ pub fn run_filter(args: &FilterArgs) -> Result<(), String> {
         args.min_contig_length
     );
     let t = std::time::Instant::now();
-    let (filtered, tooshort) = filter_contigs(&args.contig, &args.out, args.min_contig_length)?;
+    let filtered = PathBuf::from(format!("{}.contig.tmp", args.out));
+    let tooshort = PathBuf::from(format!("{}.tooshort", args.out));
+    filter_contigs(&args.contig, &filtered, &tooshort, args.min_contig_length)?;
     eprintln!("  done in {:.1}s", t.elapsed().as_secs_f64());
     eprintln!("  filtered: {}", filtered.display());
     eprintln!("  tooshort: {}", tooshort.display());
@@ -383,13 +381,40 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
 
     cli.validate()?;
 
+    let output = cli.output_dir();
+    output.ensure(cli.force_overwrite)?;
+    let work = cli.work_dir()?;
+
+    match run_pipeline_inner(cli, &output, &work) {
+        Ok(()) => {
+            work.cleanup();
+            Ok(())
+        }
+        Err(e) => {
+            work.preserve();
+            Err(e)
+        }
+    }
+}
+
+fn run_pipeline_inner(
+    cli: &PipelineArgs,
+    output: &crate::paths::OutputDir,
+    work: &crate::paths::WorkDir,
+) -> Result<(), String> {
     // Step 1: Filter contigs
     eprintln!(
         "Filtering contigs shorter than {} bp...",
         cli.min_contig_length
     );
-    let (filtered_contigs, _tooshort_path) =
-        filter_contigs(&cli.contig, &cli.out, cli.min_contig_length)?;
+    let filtered_contigs = work.filtered_contigs();
+    let tooshort_path = work.tooshort();
+    filter_contigs(
+        &cli.contig,
+        &filtered_contigs,
+        &tooshort_path,
+        cli.min_contig_length,
+    )?;
 
     // Step 2: Resolve abundance files
     let mut abund_files = cli.all_abund_files().map_err(|e| e.to_string())?;
@@ -397,12 +422,12 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
 
     if !reads_files.is_empty() {
         eprintln!("Building Bowtie2 index...");
-        let idx_prefix = format!("{}.idx", cli.out);
+        let idx_prefix = work.bowtie2_index_prefix();
         crate::external::bowtie2_build(&cli.contig, &idx_prefix)?;
 
         for (i, reads) in reads_files.iter().enumerate() {
             eprintln!("Running Bowtie2 on reads file [{}]...", reads.display());
-            let sam_path = PathBuf::from(format!("{}.sam{i}", cli.out));
+            let sam_path = work.sam(i);
             let is_fasta = reads
                 .extension()
                 .and_then(|e| e.to_str())
@@ -411,11 +436,7 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
             crate::external::bowtie2_map(&idx_prefix, reads, &sam_path, cli.thread, is_fasta)?;
 
             eprintln!("Computing abundance from SAM...");
-            let abund_path = PathBuf::from(format!(
-                "{}.reads.abund{}",
-                filtered_contigs.display(),
-                i + 1
-            ));
+            let abund_path = work.abund_from_reads(i + 1);
             compute_abundance_from_sam(&sam_path, &abund_path)?;
             abund_files.push(abund_path);
         }
@@ -426,16 +447,16 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
     }
 
     // Steps 3-4: Gene calling + HMMER marker gene search
-    // When -hmmout is provided, skip gene calling and HMMER entirely —
+    // When --hmmout is provided, skip gene calling and HMMER entirely —
     // use the pre-computed HMMER output directly.
     let marker_hmm = find_marker_hmm(cli)?;
-    let (hmmout, faa_path) = if let Some(ref user_hmmout) = cli.hmmout {
+    let hmmout = if let Some(ref user_hmmout) = cli.hmmout {
         eprintln!("Using pre-computed HMMER output: {}", user_hmmout.display());
         let hmm_hit_count = std::fs::read_to_string(user_hmmout)
             .map(|s| s.lines().filter(|l| !l.starts_with('#')).count())
             .unwrap_or(0);
         eprintln!("  {} hits", hmm_hit_count);
-        (user_hmmout.clone(), None)
+        user_hmmout.clone()
     } else {
         // Step 3: Gene calling — use provided .faa or run FragGeneScan
         let faa = if let Some(ref user_faa) = cli.faa {
@@ -443,13 +464,13 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
             user_faa.clone()
         } else {
             eprintln!("Running FragGeneScan...");
-            let prefix = filtered_contigs.display().to_string();
+            let prefix = work.fgs_output_prefix();
             crate::external::run_fraggenescan(&filtered_contigs, &prefix, cli.thread)?;
-            PathBuf::from(format!("{prefix}.frag.faa"))
+            work.fgs_faa()
         };
 
         // Step 4: HMMER marker gene search
-        let hmmout_path = PathBuf::from(format!("{}.hmmout", filtered_contigs.display()));
+        let hmmout_path = work.hmmout();
         eprintln!(
             "Running HMMER hmmsearch (marker HMM: {})...",
             marker_hmm.display()
@@ -460,7 +481,7 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
             .map(|s| s.lines().filter(|l| !l.starts_with('#')).count())
             .unwrap_or(0);
         eprintln!("  HMMER produced {} hits", hmm_hit_count);
-        (hmmout_path, Some(faa))
+        hmmout_path
     };
 
     // Step 5: Recursive binning
@@ -488,9 +509,10 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         is_initial: bool,
     }
 
+    let initial_prefix = work.prefix("run");
     let mut queue: Vec<BinTask> = vec![BinTask {
         fasta: filtered_contigs.clone(),
-        out_prefix: cli.out.clone(),
+        out_prefix: initial_prefix,
         is_initial: true,
     }];
     let mut cursor = 0;
@@ -618,15 +640,6 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
             }
         }
 
-        // Clean up intermediate files from this round
-        if !cli.preserve_intermediate {
-            let _ = std::fs::remove_file(&seed_file);
-        }
-        if !is_initial {
-            let _ = std::fs::remove_file(format!("{out_prefix}.summary"));
-            let _ = std::fs::remove_file(format!("{out_prefix}.log"));
-        }
-
         cursor += 1;
     }
 
@@ -659,8 +672,6 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
 
     for (path, abundance) in &all_bins {
         if reclassified_paths.contains(path) {
-            // This bin was re-classified (split further) — delete it
-            let _ = std::fs::remove_file(path);
             continue;
         }
 
@@ -686,35 +697,25 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
         MIN_BIN_SIZE,
     );
 
-    // Rename bins to final sequential numbering
-    // Matches run_MaxBin.pl:648-663
+    // Copy bins from work dir to output dir with final sequential numbering
     let bin_count = final_bins.len();
-    for (i, (old_path, _)) in final_bins.iter().enumerate() {
-        let bin_num = format!("{:03}", i + 1);
-        let new_path = format!("{}.{bin_num}.fasta", cli.out);
-        // Rename via tmp to avoid collisions
-        let tmp_path = format!("{new_path}.tmp");
-        let _ = std::fs::rename(old_path, &tmp_path);
-        let _ = std::fs::rename(&tmp_path, &new_path);
+    for (i, (work_path, _)) in final_bins.iter().enumerate() {
+        let out_path = output.bin(i + 1);
+        std::fs::copy(work_path, &out_path)
+            .map_err(|e| format!("Can't copy bin to {}: {e}", out_path.display()))?;
     }
 
     // Merge all noclass files + small bins into final noclass
     // Matches run_MaxBin.pl:673-710
-    // Write to a .tmp file first since the source noclass files may include
-    // the final output path (the initial EM round writes to {out}.noclass).
     {
-        let noclass_tmp = format!("{}.tmp.noclass", cli.out);
-        let noclass_final = format!("{}.noclass", cli.out);
+        let noclass_path = output.noclass();
         let mut noclass_out = std::io::BufWriter::new(
-            std::fs::File::create(&noclass_tmp)
+            std::fs::File::create(&noclass_path)
                 .map_err(|e| format!("Can't create noclass: {e}"))?,
         );
         for nc_file in &noclass_files {
             if let Ok(content) = std::fs::read(nc_file) {
                 noclass_out.write_all(&content).map_err(|e| e.to_string())?;
-            }
-            if !cli.preserve_intermediate {
-                let _ = std::fs::remove_file(nc_file);
             }
         }
         // Append small bins to noclass
@@ -722,43 +723,37 @@ pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
             if let Ok(content) = std::fs::read(small_bin) {
                 noclass_out.write_all(&content).map_err(|e| e.to_string())?;
             }
-            let _ = std::fs::remove_file(small_bin);
         }
-        drop(noclass_out); // flush before rename
-        let _ = std::fs::rename(&noclass_tmp, &noclass_final);
     }
 
     // Step 7: Rewrite summary with completeness, genome size, GC content
     // Matches run_MaxBin.pl:831-884
     let total_abund_count = abund_files.len();
-    rewrite_summary(&cli.out, bin_count, total_abund_count, &hmmout, &marker_hmm)?;
+    let bin_abundances: Vec<f64> = final_bins.iter().map(|(_, a)| *a).collect();
+    rewrite_summary(
+        output,
+        &bin_abundances,
+        total_abund_count,
+        &hmmout,
+        &marker_hmm,
+    )?;
 
     // Step 8: Write .marker file (marker gene counts per bin)
     // Matches run_MaxBin.pl:818 (countmarker call)
-    write_marker_counts(&hmmout, &cli.out, bin_count, &marker_hmm)?;
+    write_marker_counts(&hmmout, output, bin_count, &marker_hmm)?;
 
-    // Step 9: Clean up intermediate files (unless --preserve-intermediate)
-    if !cli.preserve_intermediate {
-        eprintln!("Deleting intermediate files.");
-        let _ = std::fs::remove_file(&filtered_contigs);
-        let _ = std::fs::remove_file(&hmmout);
-        if let Some(ref faa) = faa_path {
-            let _ = std::fs::remove_file(faa);
-        }
-    }
-
-    // Step 10: Write .log file
+    // Step 9: Write log file
     // Matches run_MaxBin.pl:390 (openLOG). The original writes all progress
     // output here. We write a minimal log so downstream pipelines (e.g.
     // nf-core/mag) that glob for *.log don't fail.
     {
-        let log_path = format!("{}.log", cli.out);
+        let log_path = output.log();
         let mut log = std::io::BufWriter::new(
             std::fs::File::create(&log_path).map_err(|e| format!("Can't create log file: {e}"))?,
         );
         writeln!(log, "maxbin-rs {}", env!("CARGO_PKG_VERSION")).map_err(|e| e.to_string())?;
         writeln!(log, "Input: {}", cli.contig.display()).map_err(|e| e.to_string())?;
-        writeln!(log, "Output: {}", cli.out).map_err(|e| e.to_string())?;
+        writeln!(log, "Output: {}", output.dir().display()).map_err(|e| e.to_string())?;
         writeln!(log, "Bins: {bin_count}").map_err(|e| e.to_string())?;
     }
 
@@ -1064,32 +1059,19 @@ fn get_bin_info(fasta_path: &Path) -> (usize, f64) {
 /// Rewrite the summary file to match the Perl's post-processed format.
 /// Matches run_MaxBin.pl:832-884
 fn rewrite_summary(
-    output_prefix: &str,
-    bin_count: usize,
+    output: &crate::paths::OutputDir,
+    bin_abundances: &[f64],
     abund_count: usize,
     hmmout: &Path,
     marker_hmm: &Path,
 ) -> Result<(), String> {
-    // Read the C++ summary to get abundance values
-    let summary_path = format!("{output_prefix}.summary");
-    let raw_summary =
-        std::fs::read_to_string(&summary_path).map_err(|e| format!("Can't read summary: {e}"))?;
-
-    // Parse abundance per bin from the C++ summary format: "Bin [name]\tvalue"
-    let mut bin_abundances: Vec<String> = Vec::new();
-    for line in raw_summary.lines() {
-        if line.starts_with("Bin [") {
-            let parts: Vec<&str> = line.splitn(2, '\t').collect();
-            if parts.len() >= 2 {
-                bin_abundances.push(parts[1].to_string());
-            }
-        }
-    }
+    let bin_count = bin_abundances.len();
 
     // Compute completeness from marker genes
-    let completeness = compute_completeness(hmmout, output_prefix, bin_count, marker_hmm)?;
+    let completeness = compute_completeness(hmmout, output, bin_count, marker_hmm)?;
 
     // Write final summary
+    let summary_path = output.summary();
     let mut out = std::io::BufWriter::new(
         std::fs::File::create(&summary_path).map_err(|e| format!("Can't write summary: {e}"))?,
     );
@@ -1106,33 +1088,25 @@ fn rewrite_summary(
             .map_err(|e| e.to_string())?;
     }
 
-    let out_name = Path::new(output_prefix)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(output_prefix);
-
     for i in 0..bin_count {
-        let bin_num = format!("{:03}", i + 1);
-        let bin_fasta = format!("{output_prefix}.{bin_num}.fasta");
-        let (genome_size, gc) = get_bin_info(Path::new(&bin_fasta));
+        let bin_fasta = output.bin(i + 1);
+        let bin_name = bin_fasta
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("???");
+        let (genome_size, gc) = get_bin_info(&bin_fasta);
         let compl = completeness.get(i).copied().unwrap_or(0.0) * 100.0;
-        let abund = bin_abundances.get(i).map(|s| s.as_str()).unwrap_or("0.00");
+        let abund = bin_abundances.get(i).copied().unwrap_or(0.0);
 
-        // Matches run_MaxBin.pl:859-866
-        // The Perl formats abundance with printf "%0.2f"
-        let abund_fmt: f64 = abund.parse().unwrap_or(0.0);
         if abund_count == 1 {
             writeln!(
                 out,
-                "{out_name}.{bin_num}.fasta\t{abund_fmt:.2}\t{compl:.1}%\t{genome_size}\t{gc:.1}"
+                "{bin_name}\t{abund:.2}\t{compl:.1}%\t{genome_size}\t{gc:.1}"
             )
             .map_err(|e| e.to_string())?;
         } else {
-            writeln!(
-                out,
-                "{out_name}.{bin_num}.fasta\t{compl:.1}%\t{genome_size}\t{gc:.1}"
-            )
-            .map_err(|e| e.to_string())?;
+            writeln!(out, "{bin_name}\t{compl:.1}%\t{genome_size}\t{gc:.1}")
+                .map_err(|e| e.to_string())?;
         }
     }
 
@@ -1143,7 +1117,7 @@ fn rewrite_summary(
 /// Matches _getmarker.pl:248-408 (countmarker)
 fn compute_completeness(
     hmmout: &Path,
-    output_prefix: &str,
+    output: &crate::paths::OutputDir,
     bin_count: usize,
     marker_hmm: &Path,
 ) -> Result<Vec<f64>, String> {
@@ -1174,8 +1148,8 @@ fn compute_completeness(
     // Matches _getmarker.pl:276-303
     let mut contig_to_bin: HashMap<String, usize> = HashMap::new();
     for i in 0..bin_count {
-        let bin_fasta = format!("{}.{:03}.fasta", output_prefix, i + 1);
-        if let Ok(records) = fasta::parse_file(Path::new(&bin_fasta)) {
+        let bin_fasta = output.bin(i + 1);
+        if let Ok(records) = fasta::parse_file(&bin_fasta) {
             for r in &records {
                 contig_to_bin.insert(r.header.clone(), i);
             }
@@ -1230,7 +1204,7 @@ fn compute_completeness(
 /// Matches _getmarker.pl:382-405
 fn write_marker_counts(
     hmmout: &Path,
-    output_prefix: &str,
+    output: &crate::paths::OutputDir,
     bin_count: usize,
     marker_hmm: &Path,
 ) -> Result<(), String> {
@@ -1259,8 +1233,8 @@ fn write_marker_counts(
     // Build contig→bin mapping
     let mut contig_to_bin: HashMap<String, usize> = HashMap::new();
     for i in 0..bin_count {
-        let bin_fasta = format!("{}.{:03}.fasta", output_prefix, i + 1);
-        if let Ok(records) = fasta::parse_file(Path::new(&bin_fasta)) {
+        let bin_fasta = output.bin(i + 1);
+        if let Ok(records) = fasta::parse_file(&bin_fasta) {
             for r in &records {
                 contig_to_bin.insert(r.header.clone(), i);
             }
@@ -1302,16 +1276,11 @@ fn write_marker_counts(
 
     // Write .marker file
     // Matches _getmarker.pl:382-405
-    let marker_path = format!("{output_prefix}.marker");
+    let marker_path = output.marker();
     let mut out = std::io::BufWriter::new(
         std::fs::File::create(&marker_path)
             .map_err(|e| format!("Can't create marker file: {e}"))?,
     );
-
-    let out_name = Path::new(output_prefix)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(output_prefix);
 
     // Header
     write!(out, "\tTotal marker\tUnique marker").map_err(|e| e.to_string())?;
@@ -1322,10 +1291,14 @@ fn write_marker_counts(
 
     // Per-bin rows
     for (i, bin_counts) in counts.iter().enumerate().take(bin_count) {
-        let bin_num = format!("{:03}", i + 1);
+        let bin_fasta = output.bin(i + 1);
+        let bin_name = bin_fasta
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("???");
         let total: u32 = bin_counts.iter().sum();
         let unique: u32 = bin_counts.iter().filter(|&&c| c > 0).count() as u32;
-        write!(out, "{out_name}.{bin_num}.fasta\t{total}\t{unique}").map_err(|e| e.to_string())?;
+        write!(out, "{bin_name}\t{total}\t{unique}").map_err(|e| e.to_string())?;
         for &c in bin_counts {
             if c > 0 {
                 write!(out, "\t{c}").map_err(|e| e.to_string())?;

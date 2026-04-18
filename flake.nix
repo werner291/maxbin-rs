@@ -312,6 +312,10 @@
               mkdir -p $out/bin
               ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
             '')
+            # /tmp for intermediate files (Nix Docker images have no FHS skeleton)
+            (pkgs.runCommand "tmp-dir" { } ''
+              mkdir -p $out/tmp
+            '')
           ];
           config = {
             Entrypoint = [ "${maxbin-rs}/bin/maxbin-rs" ];

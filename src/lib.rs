@@ -6,6 +6,7 @@ pub mod external;
 pub mod fasta;
 pub mod kmer_map;
 pub mod normal_distribution;
+pub mod paths;
 pub mod pipeline;
 pub mod profiler;
 pub mod quicksort;

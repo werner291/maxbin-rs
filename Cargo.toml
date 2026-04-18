@@ -7,13 +7,13 @@ edition = "2024"
 clap = { version = "4.6.1", features = ["derive"] }
 flate2 = "1.1.9"
 rayon = "1.10"
+tempfile = "3"
 
 [build-dependencies]
 cc = "1.2.60"
 
 [dev-dependencies]
 proptest = "1.11.0"
-tempfile = "3"
 
 # Optimized test profile for benchmarks.
 # Usage: cargo nextest run --cargo-profile bench bench_components -- --ignored
