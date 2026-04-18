@@ -103,7 +103,7 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" -out "$RUST/test" -thread 1 \
+  --abund "$ABUND" --out "$RUST/test" --thread 1 \
   2> "$RUST/stderr.log" || true
 
 compare_bins "$ORIG" "$RUST" "1.1 bins"
@@ -145,8 +145,8 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" -out "$RUST/test" -thread 1 \
-  --min_contig_length 500 \
+  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --min-contig-length 500 \
   2> "$RUST/stderr.log" || true
 
 compare_bins "$ORIG" "$RUST" "2.1 bins (min_contig_length=500)"
@@ -170,8 +170,8 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" -out "$RUST/test" -thread 1 \
-  --prob_threshold 0.5 \
+  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --prob-threshold 0.5 \
   2> "$RUST/stderr.log" || true
 
 compare_bins "$ORIG" "$RUST" "3.1 bins (prob_threshold=0.5)"
@@ -199,7 +199,7 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" -out "$RUST/test" -thread 1 \
+  --abund "$ABUND" --out "$RUST/test" --thread 1 \
   --markerset 40 \
   2>&1 || true
 echo "  maxbin-rs output files: $(ls "$RUST"/test.* 2>/dev/null || echo '(none)')"
@@ -223,14 +223,14 @@ if [ -n "${READS1:-}" ]; then
 
   echo "  Running original MaxBin2..."
   run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
-    --reads "$WORK/reads1_input.fastq.gz" \
-    --out "$ORIG/test" -thread 1 -prob_threshold 0.9 \
+    -reads "$WORK/reads1_input.fastq.gz" \
+    -out "$ORIG/test" -thread 1 -prob_threshold 0.9 \
     > "$ORIG/stdout.log" 2>&1 || true
 
   echo "  Running maxbin-rs..."
   maxbin-rs --contig "$CONTIGS" \
     --reads "$READS1" \
-    --out "$RUST/test" -thread 1 \
+    --out "$RUST/test" --thread 1 \
     2> "$RUST/stderr.log" || true
 
   compare_bins "$ORIG" "$RUST" "5.1 bins (reads mode)"
@@ -257,8 +257,8 @@ run_MaxBin.pl -contig "$WORK/contigs_input.fa.gz" \
 
 echo "  Running maxbin-rs..."
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" -out "$RUST/test" -thread 1 \
-  --max_iteration 1 \
+  --abund "$ABUND" --out "$RUST/test" --thread 1 \
+  --max-iteration 1 \
   2> "$RUST/stderr.log" || true
 
 compare_bins "$ORIG" "$RUST" "6.1 bins (max_iteration=1)"

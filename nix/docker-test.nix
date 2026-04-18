@@ -36,9 +36,9 @@ pkgs.testers.runNixOSTest {
     machine.succeed("cp ${datasets.bfragilis.contigs} /tmp/testdata/contigs.fa.gz")
     machine.succeed("cp ${datasets.bfragilis.reads1} /tmp/testdata/reads1.fastq.gz")
 
-    # Smoke test: -version exits cleanly
+    # Smoke test: --version exits cleanly
     machine.succeed(
-        "docker run --rm ghcr.io/werner291/maxbin-rs:latest -version"
+        "docker run --rm ghcr.io/werner291/maxbin-rs:latest --version"
     )
 
     # Integration test: run full pipeline on B. fragilis
@@ -47,10 +47,10 @@ pkgs.testers.runNixOSTest {
         "-v /tmp/testdata:/input:ro "
         "-v /tmp/output:/output "
         "ghcr.io/werner291/maxbin-rs:latest "
-        "-contig /input/contigs.fa.gz "
-        "-reads /input/reads1.fastq.gz "
-        "-out /output/bins "
-        "-thread 1 "
+        "--contig /input/contigs.fa.gz "
+        "--reads /input/reads1.fastq.gz "
+        "--out /output/bins "
+        "--thread 1 "
         "2>&1 || true"
     )
     print(result)

@@ -102,7 +102,7 @@ mkdir -p "$RUST"
 echo "--- Running maxbin-rs ---"
 RUST_START=$SECONDS
 maxbin-rs --contig "$CONTIGS" \
-  --abund "$ABUND" -hmmout "$HMMOUT" -out "$RUST/test" -thread 1 \
+  --abund "$ABUND" --hmmout "$HMMOUT" --out "$RUST/test" --thread 1 \
   2>&1 | grep --line-buffered -v -E 'candidate: marker=|^  seed: |EM iteration [0-9]|no seeds .* skipping|median ≤ 1' | sed -u 's/^/  rust│ /'
 RUST_ELAPSED=$((SECONDS - RUST_START))
 echo ""

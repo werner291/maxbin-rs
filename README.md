@@ -53,12 +53,20 @@ The pipeline also accepts pre-computed intermediates, letting you skip
 expensive stages you've already run:
 
 ```bash
+# Skip gene calling (bring your own protein FASTA, e.g. from Prodigal)
+maxbin-rs --contig contigs.fa --abund depth.txt --faa proteins.faa --out result
+
 # Skip gene calling + HMMER (bring your own HMMER output)
 maxbin-rs --contig contigs.fa --abund depth.txt --hmmout hits.txt --out result
 
 # Skip read alignment (bring your own abundance file)
 maxbin-rs --contig contigs.fa --abund depth.txt --out result
 ```
+
+The `--faa` flag was inspired by
+[maxbin2_custom](https://github.com/mruehlemann/maxbin2_custom), which
+replaced FragGeneScan with Prodigal. We generalize this: any gene
+caller's protein FASTA output works.
 
 **Note:** the full pipeline shells out to HMMER, Bowtie2, and
 FragGeneScan at runtime. The Nix package bundles these automatically.
@@ -208,6 +216,12 @@ These are intentional or unavoidable and should not affect correctness:
 
 - **Binary name**: `maxbin-rs`, not `run_MaxBin.pl`. Pipeline modules
   that hardcode the binary name need updating.
+- **Double-dash flags** (v0.3+): `--contig` instead of `-contig`.
+  Since v0.2 already changes the default `prob_threshold`, scripts
+  need updating anyway — switching to standard flag syntax at the same
+  time gives you proper `--help`, shell completions, and robust error
+  messages via [clap](https://docs.rs/clap/). For the original
+  single-dash syntax, use v0.1.x or v0.2.x.
 - **Version output**: `maxbin-rs 0.1.3` (via `-v` or `--version`),
   not `MaxBin 2.2.7`. Pipelines that parse version strings (e.g.
   nf-core/mag's `sed 's/MaxBin //'`) need a one-line fix.

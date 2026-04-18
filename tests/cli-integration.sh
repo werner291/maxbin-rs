@@ -150,7 +150,7 @@ assert_file_exists "$D/basic/test.tooshort" "2.1 tooshort"
 
 # 2.2 min_contig_length=500 (more contigs pass)
 mkdir -p "$D/len500"
-maxbin-rs filter --contig "$CONTIGS" --out "$D/len500/test" -min_contig_length 500 2>/dev/null
+maxbin-rs filter --contig "$CONTIGS" --out "$D/len500/test" --min-contig-length 500 2>/dev/null
 COUNT_500=$(fasta_record_count "$D/len500/test.contig.tmp")
 if [ "$COUNT_500" -ge "$FILTERED_COUNT" ]; then
   pass "2.2 min_contig_length=500 ($COUNT_500 >= $FILTERED_COUNT)"
@@ -160,7 +160,7 @@ fi
 
 # 2.3 min_contig_length=5000 (fewer contigs pass)
 mkdir -p "$D/len5000"
-maxbin-rs filter --contig "$CONTIGS" --out "$D/len5000/test" -min_contig_length 5000 2>/dev/null
+maxbin-rs filter --contig "$CONTIGS" --out "$D/len5000/test" --min-contig-length 5000 2>/dev/null
 COUNT_5000=$(fasta_record_count "$D/len5000/test.contig.tmp")
 if [ "$COUNT_5000" -le "$FILTERED_COUNT" ]; then
   pass "2.3 min_contig_length=5000 ($COUNT_5000 <= $FILTERED_COUNT)"
@@ -168,25 +168,19 @@ else
   fail "2.3 min_contig_length=5000 ($COUNT_5000 > $FILTERED_COUNT)"
 fi
 
-# 2.4 double-dash flag normalization
-mkdir -p "$D/ddash"
-maxbin-rs filter ---contig "$CONTIGS" ---out "$D/ddash/test" --min-contig-length 500 2>/dev/null
-assert_files_identical "$D/len500/test.contig.tmp" "$D/ddash/test.contig.tmp" \
-  "2.4 double-dash identical to single-dash"
+# 2.4 missing --contig
+assert_exit_code "2.4 filter-missing-contig" 1 maxbin-rs filter --out prefix
 
-# 2.5 missing -contig
-assert_exit_code "2.5 filter-missing-contig" 1 maxbin-rs filter ---out prefix
+# 2.5 missing --out
+assert_exit_code "2.5 filter-missing-out" 1 maxbin-rs filter --contig "$CONTIGS"
 
-# 2.6 missing -out
-assert_exit_code "2.6 filter-missing-out" 1 maxbin-rs filter --contig "$CONTIGS"
-
-# 2.7 unrecognized flag
-assert_exit_code_stderr "2.7 filter-unrecognized-flag" 1 "unrecognized" \
+# 2.6 unrecognized flag
+assert_exit_code_stderr "2.6 filter-unrecognized-flag" 1 "unexpected" \
   maxbin-rs filter --contig "$CONTIGS" --out prefix --bogus
 
-# 2.8 min_contig_length=1 (all pass)
+# 2.7 min_contig_length=1 (all pass)
 mkdir -p "$D/len1"
-maxbin-rs filter --contig "$CONTIGS" --out "$D/len1/test" -min_contig_length 1 2>/dev/null
+maxbin-rs filter --contig "$CONTIGS" --out "$D/len1/test" --min-contig-length 1 2>/dev/null
 TOOSHORT_COUNT=$(fasta_record_count "$D/len1/test.tooshort")
 if [ "$TOOSHORT_COUNT" -eq 0 ]; then
   pass "2.8 min_contig_length=1 (no tooshort)"
@@ -216,27 +210,21 @@ D="$WORK/seeds"
 # 3.1 basic (default markerset=107)
 mkdir -p "$D/basic"
 assert_exit_code "3.1 seeds-basic" 0 \
-  maxbin-rs seeds --contig "$FILTERED" -hmmout "$HMMOUT" --out "$D/basic/test"
+  maxbin-rs seeds --contig "$FILTERED" --hmmout "$HMMOUT" --out "$D/basic/test"
 assert_file_nonempty "$D/basic/test.seed" "3.1 seed file"
 
 # 3.2 markerset 40
 mkdir -p "$D/m40"
-maxbin-rs seeds --contig "$FILTERED" -hmmout "$HMMOUT" --out "$D/m40/test" -markerset 40 2>/dev/null
+maxbin-rs seeds --contig "$FILTERED" --hmmout "$HMMOUT" --out "$D/m40/test" --markerset 40 2>/dev/null
 assert_file_exists "$D/m40/test.seed" "3.2 markerset=40 seed file"
 
-# 3.3 double-dash flags
-mkdir -p "$D/ddash"
-maxbin-rs seeds ---contig "$FILTERED" --hmmout "$HMMOUT" ---out "$D/ddash/test" 2>/dev/null
-assert_files_identical "$D/basic/test.seed" "$D/ddash/test.seed" \
-  "3.3 double-dash identical"
-
-# 3.4 missing required args
-assert_exit_code "3.4 seeds-missing-hmmout" 1 \
+# 3.3 missing required args
+assert_exit_code "3.3 seeds-missing-hmmout" 1 \
   maxbin-rs seeds --contig "$FILTERED" --out prefix
-assert_exit_code "3.5 seeds-missing-contig" 1 \
+assert_exit_code "3.4 seeds-missing-contig" 1 \
   maxbin-rs seeds --hmmout "$HMMOUT" --out prefix
-assert_exit_code "3.6 seeds-missing-out" 1 \
-  maxbin-rs seeds --contig "$FILTERED" -hmmout "$HMMOUT"
+assert_exit_code "3.5 seeds-missing-out" 1 \
+  maxbin-rs seeds --contig "$FILTERED" --hmmout "$HMMOUT"
 
 echo ""
 
@@ -290,37 +278,25 @@ else
   fail "4.4 thread=2 bins differ from thread=1"
 fi
 
-# 4.5 double-dash and hyphenated flags
-mkdir -p "$D/ddash"
-maxbin-rs em ---contig "$FILTERED" ---abund "$ABUND" ---seed "$SEED" ---out "$D/ddash/test" \
-  --prob-threshold 0.9 --max-iteration 50 2>/dev/null
-BINS_PT09=$(for f in "$D/pt09"/test.*.fasta; do sha256sum "$f" | cut -d' ' -f1; done | sort)
-BINS_DDASH=$(for f in "$D/ddash"/test.*.fasta; do sha256sum "$f" | cut -d' ' -f1; done | sort)
-if [ "$BINS_PT09" = "$BINS_DDASH" ]; then
-  pass "4.5 double-dash+hyphens identical bins"
-else
-  fail "4.5 double-dash+hyphens bins differ"
-fi
-
-# 4.6 multiple abund files (same file twice = degenerate but valid)
+# 4.5 multiple abund files (same file twice = degenerate but valid)
 mkdir -p "$D/multi_abund"
-assert_exit_code "4.6 em-multiple-abund" 0 \
-  maxbin-rs em --contig "$FILTERED" --abund "$ABUND" -abund2 "$ABUND" \
-  ---seed "$SEED" --out "$D/multi_abund/test"
+assert_exit_code "4.5 em-multiple-abund" 0 \
+  maxbin-rs em --contig "$FILTERED" --abund "$ABUND" --abund "$ABUND" \
+  --seed "$SEED" --out "$D/multi_abund/test"
 
-# 4.7 abund_list
+# 4.6 abund_list
 mkdir -p "$D/abund_list"
 echo "$ABUND" > "$D/abund_list/list.txt"
-assert_exit_code "4.7 em-abund-list" 0 \
-  maxbin-rs em --contig "$FILTERED" -abund_list "$D/abund_list/list.txt" \
-  ---seed "$SEED" --out "$D/abund_list/test"
+assert_exit_code "4.6 em-abund-list" 0 \
+  maxbin-rs em --contig "$FILTERED" --abund-list "$D/abund_list/list.txt" \
+  --seed "$SEED" --out "$D/abund_list/test"
 
-# 4.8 missing required args
-assert_exit_code "4.8 em-missing-seed" 1 \
+# 4.7 missing required args
+assert_exit_code "4.7 em-missing-seed" 1 \
   maxbin-rs em --contig "$FILTERED" --abund "$ABUND" --out prefix
-assert_exit_code "4.9 em-missing-contig" 1 \
-  maxbin-rs em ---abund "$ABUND" --seed "$SEED" --out prefix
-assert_exit_code "4.10 em-missing-out" 1 \
+assert_exit_code "4.8 em-missing-contig" 1 \
+  maxbin-rs em --abund "$ABUND" --seed "$SEED" --out prefix
+assert_exit_code "4.9 em-missing-out" 1 \
   maxbin-rs em --contig "$FILTERED" --abund "$ABUND" --seed "$SEED"
 
 echo ""
@@ -346,9 +322,9 @@ assert_exit_code "5.2 cpp_em-underscore" 0 \
 echo ""
 
 # =========================================================================
-# 6. sam-to--abund subcommand
+# 6. sam-to-abund subcommand
 # =========================================================================
-echo "--- 6. sam-to--abund subcommand ---"
+echo "--- 6. sam-to-abund subcommand ---"
 
 D="$WORK/sam_to_abund"
 
@@ -356,25 +332,19 @@ if [ -f "$SAM" ]; then
   # 6.1 basic
   mkdir -p "$D/basic"
   assert_exit_code "6.1 sam-to-abund-basic" 0 \
-    maxbin-rs sam-to--abund --sam "$SAM" --out "$D/basic/abund.txt"
+    maxbin-rs sam-to-abund --sam "$SAM" --out "$D/basic/abund.txt"
   assert_file_nonempty "$D/basic/abund.txt" "6.1 output"
 
-  # 6.2 double-dash
-  mkdir -p "$D/ddash"
-  maxbin-rs sam-to--abund ---sam "$SAM" ---out "$D/ddash/abund.txt" 2>/dev/null
-  assert_files_identical "$D/basic/abund.txt" "$D/ddash/abund.txt" \
-    "6.2 double-dash identical"
-
-  # 6.3 underscore subcommand variant
+  # 6.2 underscore subcommand variant
   mkdir -p "$D/underscore"
-  assert_exit_code "6.3 sam_to_abund-underscore" 0 \
+  assert_exit_code "6.2 sam_to_abund-underscore" 0 \
     maxbin-rs sam_to_abund --sam "$SAM" --out "$D/underscore/abund.txt"
 
-  # 6.4 missing args
-  assert_exit_code "6.4 sam-to-abund-missing-sam" 1 maxbin-rs sam-to--abund ---out out.txt
-  assert_exit_code "6.5 sam-to-abund-missing-out" 1 maxbin-rs sam-to--abund --sam "$SAM"
+  # 6.3 missing args
+  assert_exit_code "6.3 sam-to-abund-missing-sam" 1 maxbin-rs sam-to-abund --out out.txt
+  assert_exit_code "6.4 sam-to-abund-missing-out" 1 maxbin-rs sam-to-abund --sam "$SAM"
 else
-  skip "6.x sam-to--abund (no SAM file for this dataset)"
+  skip "6.x sam-to-abund (no SAM file for this dataset)"
 fi
 
 echo ""
@@ -406,20 +376,20 @@ assert_exit_code "7.5 legacy-no-reads-no-abund" 1 maxbin-rs --contig "$CONTIGS" 
 # 7.4 preserve_intermediate
 mkdir -p "$D/preserve"
 maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/preserve/test" \
-  --preserve_intermediate 2>/dev/null
+  --preserve-intermediate 2>/dev/null
 assert_file_exists "$D/preserve/test.seed" "7.6 preserve_intermediate keeps seed"
 assert_file_exists "$D/preserve/test.contig.tmp" "7.6 preserve_intermediate keeps contig.tmp"
 
 # 7.5 verbose (just check it doesn't crash)
 mkdir -p "$D/verbose"
 assert_exit_code "7.7 verbose-flag" 0 \
-  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/verbose/test" -verbose
+  maxbin-rs --contig "$CONTIGS" --abund "$ABUND" --out "$D/verbose/test" --verbose
 
 # 7.6 multiple reads files
 if [ -n "${READS1:-}" ] && [ -n "${READS2:-}" ]; then
   mkdir -p "$D/multi_reads"
   assert_exit_code "7.8 legacy-multi-reads" 0 \
-    maxbin-rs --contig "$CONTIGS" -reads "$READS1" --reads "$READS2" --out "$D/multi_reads/test"
+    maxbin-rs --contig "$CONTIGS" --reads "$READS1" --reads "$READS2" --out "$D/multi_reads/test"
   assert_file_exists "$D/multi_reads/test.summary" "7.8 summary"
 else
   skip "7.8 legacy-multi-reads (no READS2)"
