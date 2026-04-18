@@ -34,6 +34,11 @@ pub fn parse<R: std::io::BufRead>(reader: R) -> Result<Vec<AbundanceRecord>, Str
             continue;
         }
 
+        // Matches run_MaxBin.pl:1521-1523 (checkAbundFile): strip leading '>'
+        // from headers. Some abundance files use FASTA-style ">contig_name"
+        // headers; the Perl preprocesses these before the C++ sees them.
+        let line = line.strip_prefix('>').unwrap_or(line);
+
         // Matches AbundanceLoader.cpp:99-107: advance past the header until separator
         let sep_pos = line
             .find(['\t', ' ', ',', ';'])
@@ -130,6 +135,17 @@ mod tests {
         assert_eq!(space[0].abundance, 1.0);
         assert_eq!(comma[0].abundance, 1.0);
         assert_eq!(semi[0].abundance, 1.0);
+    }
+
+    #[test]
+    fn strips_fasta_header_prefix() {
+        let input = b">contig1\t42.5\n>contig2\t0.001\ncontig3\t1.0\n";
+        let records = parse(Cursor::new(input)).unwrap();
+
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].header, "contig1");
+        assert_eq!(records[1].header, "contig2");
+        assert_eq!(records[2].header, "contig3");
     }
 
     #[test]

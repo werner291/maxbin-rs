@@ -140,15 +140,9 @@ and assignments on the same input across runs — the EM algorithm converges to
 different local optima depending on which contigs are used as initial seeds and
 in what order.
 
-By default, maxbin-rs **shuffles seeds randomly** at startup, matching the
-original's effectively-random behavior. Setting `MAXBIN_RS_DETERMINISTIC=1`
-sorts seeds alphabetically instead, producing reproducible output. The
-pipeline stage tests use this mode, together with a patch to the original
-Perl, so both tools produce comparable output.
-
-**I lack the domain expertise to determine whether the original's random
-seed ordering serves as a form of regularization.** If you are a metagenomics
-researcher and have insight on this, I would welcome your input.
+maxbin-rs always sorts seeds deterministically. The equivalence tests
+patch the original Perl to do the same (via sorted hash iteration), so
+both tools produce identical seed ordering and comparable output.
 
 ### Other differences
 
