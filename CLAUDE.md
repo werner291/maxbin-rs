@@ -28,8 +28,9 @@ cargo fmt --check        # check formatting
 
 Shell-based equivalence and integration tests live in `tests/`:
 - `tests/equivalence-e2e.sh` — end-to-end comparison against original MaxBin2
-- `tests/pipeline-stages.sh` — individual subcommand tests
+- `tests/pipeline-trace.sh` — recursive pipeline equivalence (Rust vs C++)
 - `tests/cli-equivalence.sh` / `tests/cli-integration.sh` — CLI behavior
+- `tests/bench-genecaller.sh` — FragGeneScan vs FragGeneScanRs benchmark
 
 ## Architecture
 
@@ -85,6 +86,37 @@ See [VERSIONING.md](VERSIONING.md). Key rule: **"breaking change" = changes binn
 output on the same input.** v0.1.x is bug-for-bug compatible with original MaxBin2.
 v0.2.x introduces correctness fixes that change output (recoverable via explicit flags).
 Bug fixes (crashes, packaging, diagnostics) never need a minor version bump.
+
+## Pre-commit Review
+
+Before committing, run two reviewer agents in parallel with clean context
+(no conversation history). Use the Agent tool with `model: "sonnet"`.
+
+**Adversarial** — finds overclaims, stale references, AI-generated slop:
+
+> You are a bioinformatician reviewing changes to maxbin-rs, a Rust
+> reimplementation of MaxBin2. You've been asked to review the uncommitted
+> changes and the last N commits on main. You have a low tolerance for
+> AI-generated slop, vague claims, and stale references. Be adversarial.
+>
+> Look for: stale references to removed things, overclaims in docs,
+> incorrect comments, broken cross-references, anything that would
+> confuse a new contributor. Report what you find — file:line when
+> possible. Under 300 words.
+
+**Neutral** — catches the same issues with different framing:
+
+> You're reviewing changes to maxbin-rs, a Rust reimplementation of
+> MaxBin2. Give honest first impressions of the uncommitted changes and
+> last N commits.
+>
+> Focus on: dangling references, docs accuracy, nix flake output
+> consistency, anything a fresh contributor would stumble on. Report
+> what you find — file:line when possible. Under 300 words.
+
+Both agents should run `git log`, `git diff HEAD`, and `git diff HEAD~N..HEAD`
+to understand the changes. Reuse these exact prompts — don't rephrase for
+follow-up passes (see memory: feedback_reviewer_prompts.md).
 
 ## Remaining Design Goals
 

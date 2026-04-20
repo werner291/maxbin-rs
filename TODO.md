@@ -47,7 +47,7 @@
   The authors don't document any expected divergence.
   [FragGeneScanRs repo](https://github.com/unipept/FragGeneScanRs)
 
-  Reproduction (`nix run .#bench-genecaller`):
+  Reproduction (`nix run .#bench-genecaller-bfragilis`):
   ```
   FragGeneScan:   1895 genes
   FragGeneScanRs: 1898 genes

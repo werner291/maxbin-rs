@@ -14,10 +14,6 @@
 #
 # Quick reference:
 #   nix build                               — build maxbin-rs
-#   nix run .#test-pipeline-stages-bfragilis — run B. fragilis stage tests
-#   nix run .#test-pipeline-stages-capes    — run CAPES_S7 stage tests
-#   nix run .#test-pipeline-stages-cami     — run CAMI I High stage tests
-#   nix run .#test-pipeline-stages-metahit  — run MetaHIT stage tests
 #   nix build .#disasm-em                   — disassemble EM hot functions
 #   nix develop                             — enter development shell
 
@@ -360,10 +356,6 @@
             ;
           "cami-small" = intermediates.cami-small;
           inherit (tests)
-            test-pipeline-stages-bfragilis
-            test-pipeline-stages-capes
-            test-pipeline-stages-cami
-            test-pipeline-stages-metahit
             test-cli-bfragilis
             test-cli-equivalence-bfragilis
             test-cli-equivalence-capes
@@ -454,7 +446,7 @@
               nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
             }
           );
-          inherit (tests) test-pipeline-stages-bfragilis test-cli-bfragilis test-cli-equivalence-bfragilis;
+          inherit (tests) test-cli-bfragilis test-cli-equivalence-bfragilis;
           inherit dockerTest;
           # End-to-end recursive equivalence: f64-patched C++ vs Rust on
           # downsampled CAMI (5000 contigs, depth-5 recursion). Asserts

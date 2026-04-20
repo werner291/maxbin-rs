@@ -77,7 +77,7 @@ maxbin-rs em --contig filtered.fa --abund depth.txt --seed seeds.txt --out resul
 ```
 
 The default mode (`maxbin-rs pipeline`) wraps this with gene calling
-(FragGeneScan), marker detection (HMMER), and read mapping (Bowtie2) to
+(FragGeneScanRs), marker detection (HMMER), and read mapping (Bowtie2) to
 produce seeds and abundance automatically. You can also supply your own
 intermediates via `--faa` (protein FASTA) or `--hmmout` (HMMER output)
 to substitute individual stages. See `maxbin-rs --help` for all options.
@@ -122,12 +122,6 @@ described in detail in [PAPER.md](PAPER.md). In short:
 
 - **Unit/property tests** compare each Rust function against the
   original C++ via FFI on randomized inputs (`cargo nextest run`).
-- **Per-stage tests** compare each pipeline stage independently against
-  the original MaxBin2 on multiple datasets:
-  ```bash
-  nix build .#test-pipeline-stages-bfragilis  # B. fragilis (~1 min)
-  nix build .#test-pipeline-stages-cami  # CAMI I High, 36K contigs (~50 min)
-  ```
 - **End-to-end tests** run the full pipeline (including recursive
   binning) on CAMI I High: all bins byte-identical.
 - The EM core is approximately **8x faster** than the original C++

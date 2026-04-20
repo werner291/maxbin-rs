@@ -8,12 +8,6 @@
 # without knowing Nix), but they need paths to data in the Nix store —
 # which only Nix knows. These wrappers bridge that gap.
 #
-# Pipeline stage tests (primary verification):
-#   nix run .#test-pipeline-stages-bfragilis — B. fragilis (~1 min)
-#   nix run .#test-pipeline-stages-capes     — CAPES_S7 (~10 min, 2.5 GB download)
-#   nix run .#test-pipeline-stages-cami      — CAMI I High (~1-3 hours, 779 MB contigs)
-#   nix run .#test-pipeline-stages-metahit   — MetaHIT (~3 hours, 275 MB contigs)
-#
 # Component benchmark:
 #   nix run .#bench-components              — per-function Rust vs C++ timing
 
@@ -36,35 +30,6 @@
 }:
 
 let
-  # Helper: create a sandboxed pipeline stage test for a given dataset.
-  # Runs tests/pipeline-stages.sh inside the Nix build sandbox — isolated
-  # filesystem, no network, no host environment variables. The only tools
-  # available are those explicitly listed in PATH below.
-  mkStageTest =
-    {
-      name,
-      dataset,
-      intermediates',
-    }:
-    runCommand "test-pipeline-stages-${name}"
-      {
-        nativeBuildInputs = [
-          maxbin2
-          maxbin-rs
-        ];
-      }
-      ''
-        export INTERMEDIATES="${intermediates'}"
-        export MAXBIN2_TEST_CONTIGS="${dataset.contigs}"
-        export MAXBIN_RS_DETERMINISTIC=1
-        export HOME=$(mktemp -d)
-
-        bash ${../tests/pipeline-stages.sh}
-
-        # runCommand requires an output — touch $out to signal success.
-        touch $out
-      '';
-
   # Helper: create a sandboxed CLI integration test for a given dataset.
   # Runs tests/cli-integration.sh with the binary on PATH and test data
   # available. Tests flag parsing, subcommands, error cases, and output
@@ -157,30 +122,6 @@ let
     };
 in
 {
-  test-pipeline-stages-bfragilis = mkStageTest {
-    name = "bfragilis";
-    dataset = datasets.bfragilis;
-    intermediates' = intermediates.bfragilis;
-  };
-
-  test-pipeline-stages-capes = mkStageTest {
-    name = "capes";
-    dataset = datasets.capes-s7;
-    intermediates' = intermediates.capes;
-  };
-
-  test-pipeline-stages-cami = mkStageTest {
-    name = "cami";
-    dataset = datasets.cami-i-high;
-    intermediates' = intermediates.cami;
-  };
-
-  test-pipeline-stages-metahit = mkStageTest {
-    name = "metahit";
-    dataset = datasets.metahit;
-    intermediates' = intermediates.metahit;
-  };
-
   # CLI integration tests — end-to-end flag parsing, subcommands, error cases.
   test-cli-bfragilis = mkCliTest {
     name = "bfragilis";

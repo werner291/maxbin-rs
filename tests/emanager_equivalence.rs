@@ -5,8 +5,8 @@
 /// minimal dataset with two clearly separable contig groups (AT-rich vs
 /// GC-rich at different abundances), so the EM must produce two bins.
 ///
-/// For equivalence testing on real metagenomics data, see the pipeline
-/// stage tests: tests/pipeline-stages.sh (run via nix run .#test-pipeline-stages).
+/// For equivalence testing on real metagenomics data, see the recursive
+/// equivalence check (nix flake check) and CLI integration tests.
 use std::io::Write;
 use std::path::Path;
 

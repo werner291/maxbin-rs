@@ -6,10 +6,10 @@
 #
 # Environment variables (set by the Nix wrapper):
 #   CONTIGS           — input contig FASTA file
-#   FRAGGENESCAN_DIR  — path to FragGeneScan libexec dir (contains run_FragGeneScan.pl)
-#   FRAGGENESCANRS    — path to FragGeneScanRs binary
 #   TRAIN_DIR         — path to FragGeneScanRs training data directory
 #   THREADS           — thread count (default: 1)
+#
+# Both run_FragGeneScan.pl and FragGeneScanRs must be on $PATH.
 
 set -euo pipefail
 
