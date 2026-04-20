@@ -37,11 +37,17 @@ Changes so far:
 Each breaking change is documented with motivation — why the old
 behavior was wrong, not just what changed.
 
-### v0.3.x — Internalized dependencies, interface changes
+### v0.3.x — Output directory layout
 
-External tool dependencies replaced by library calls where possible.
-Output directory layout changes. Previous behavior recoverable via
-explicit flags (e.g. `--legacy-fraggenescan`).
+`--out` is a directory instead of a prefix. Intermediates go to a
+tempdir by default.
+
+### v0.4.x — Internalized gene calling
+
+Gene calling via FragGeneScanRs (Rust library) instead of shelling out
+to FragGeneScan (C + Perl). Changes binning output because FGSrs
+produces slightly different gene predictions at boundary cases.
+Previous behavior recoverable via `--legacy-fraggenescan`.
 
 ## Branching
 
