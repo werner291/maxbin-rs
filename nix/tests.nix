@@ -9,11 +9,10 @@
 # which only Nix knows. These wrappers bridge that gap.
 #
 # Pipeline stage tests (primary verification):
-#   nix run .#test-pipeline-stages          — B. fragilis (~1 min)
-#   nix run .#test-pipeline-stages-minigut  — minigut (~2 min)
-#   nix run .#test-pipeline-stages-capes    — CAPES_S7 (~10 min, 2.5 GB download)
-#   nix run .#test-pipeline-stages-cami     — CAMI I High (~1-3 hours, 779 MB contigs)
-#   nix run .#test-pipeline-stages-metahit  — MetaHIT (~3 hours, 275 MB contigs)
+#   nix run .#test-pipeline-stages-bfragilis — B. fragilis (~1 min)
+#   nix run .#test-pipeline-stages-capes     — CAPES_S7 (~10 min, 2.5 GB download)
+#   nix run .#test-pipeline-stages-cami      — CAMI I High (~1-3 hours, 779 MB contigs)
+#   nix run .#test-pipeline-stages-metahit   — MetaHIT (~3 hours, 275 MB contigs)
 #
 # Component benchmark:
 #   nix run .#bench-components              — per-function Rust vs C++ timing
@@ -158,16 +157,10 @@ let
     };
 in
 {
-  test-pipeline-stages = mkStageTest {
+  test-pipeline-stages-bfragilis = mkStageTest {
     name = "bfragilis";
     dataset = datasets.bfragilis;
     intermediates' = intermediates.bfragilis;
-  };
-
-  test-pipeline-stages-minigut = mkStageTest {
-    name = "minigut";
-    dataset = datasets.minigut;
-    intermediates' = intermediates.minigut;
   };
 
   test-pipeline-stages-capes = mkStageTest {
@@ -189,29 +182,17 @@ in
   };
 
   # CLI integration tests — end-to-end flag parsing, subcommands, error cases.
-  test-cli = mkCliTest {
+  test-cli-bfragilis = mkCliTest {
     name = "bfragilis";
     dataset = datasets.bfragilis;
     intermediates' = intermediates.bfragilis;
-  };
-
-  test-cli-minigut = mkCliTest {
-    name = "minigut";
-    dataset = datasets.minigut;
-    intermediates' = intermediates.minigut;
   };
 
   # CLI equivalence tests — run both tools, compare output.
-  test-cli-equivalence = mkCliEquivTest {
+  test-cli-equivalence-bfragilis = mkCliEquivTest {
     name = "bfragilis";
     dataset = datasets.bfragilis;
     intermediates' = intermediates.bfragilis;
-  };
-
-  test-cli-equivalence-minigut = mkCliEquivTest {
-    name = "minigut";
-    dataset = datasets.minigut;
-    intermediates' = intermediates.minigut;
   };
 
   test-cli-equivalence-capes = mkCliEquivTest {
@@ -510,28 +491,15 @@ in
 
   # Gene caller benchmark: FragGeneScan (C) vs FragGeneScanRs (Rust).
   # Compares wall-clock time and output on assembled contigs.
-  #   nix run .#bench-genecaller              — B. fragilis (small, seconds)
-  #   nix run .#bench-genecaller-minigut      — minigut (medium, minutes)
-  bench-genecaller = writeShellApplication {
-    name = "bench-genecaller";
+  #   nix run .#bench-genecaller-bfragilis    — B. fragilis (small, seconds)
+  #   nix run .#bench-genecaller-capes        — CAPES_S7 (25K contigs, minutes)
+  bench-genecaller-bfragilis = writeShellApplication {
+    name = "bench-genecaller-bfragilis";
     runtimeInputs = [
       fraggenescan-rs
     ];
     text = ''
       export CONTIGS="${datasets.bfragilis.contigs}"
-      export TRAIN_DIR="${fraggenescan-rs}/share/FragGeneScanRs/train"
-      export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
-      bash ${../tests/bench-genecaller.sh}
-    '';
-  };
-
-  bench-genecaller-minigut = writeShellApplication {
-    name = "bench-genecaller-minigut";
-    runtimeInputs = [
-      fraggenescan-rs
-    ];
-    text = ''
-      export CONTIGS="${datasets.minigut.contigs}"
       export TRAIN_DIR="${fraggenescan-rs}/share/FragGeneScanRs/train"
       export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
       bash ${../tests/bench-genecaller.sh}

@@ -14,8 +14,7 @@
 #
 # Quick reference:
 #   nix build                               — build maxbin-rs
-#   nix run .#test-pipeline-stages          — run B. fragilis stage tests
-#   nix run .#test-pipeline-stages-minigut  — run minigut stage tests
+#   nix run .#test-pipeline-stages-bfragilis — run B. fragilis stage tests
 #   nix run .#test-pipeline-stages-capes    — run CAPES_S7 stage tests
 #   nix run .#test-pipeline-stages-cami     — run CAMI I High stage tests
 #   nix run .#test-pipeline-stages-metahit  — run MetaHIT stage tests
@@ -214,11 +213,6 @@
             contigs = datasets.bfragilis.contigs;
             reads = datasets.bfragilis.reads1;
           };
-          minigut = intermediatesLib.mkPipelineIntermediates {
-            name = "minigut";
-            contigs = datasets.minigut.contigs;
-            reads = datasets.minigut.reads1;
-          };
           capes = intermediatesLib.mkPipelineIntermediates {
             name = "capes";
             contigs = datasets.capes-s7.contigs;
@@ -360,22 +354,18 @@
             ;
           inherit (intermediates)
             bfragilis
-            minigut
             capes
             cami
             metahit
             ;
           "cami-small" = intermediates.cami-small;
           inherit (tests)
-            test-pipeline-stages
-            test-pipeline-stages-minigut
+            test-pipeline-stages-bfragilis
             test-pipeline-stages-capes
             test-pipeline-stages-cami
             test-pipeline-stages-metahit
-            test-cli
-            test-cli-minigut
-            test-cli-equivalence
-            test-cli-equivalence-minigut
+            test-cli-bfragilis
+            test-cli-equivalence-bfragilis
             test-cli-equivalence-capes
             trace-cami-small
             trace-cami-small-ldouble
@@ -384,8 +374,7 @@
             bench-components
             bench-cpp-lto
             disasm-em
-            bench-genecaller
-            bench-genecaller-minigut
+            bench-genecaller-bfragilis
             bench-genecaller-capes
             ;
         };
@@ -465,7 +454,7 @@
               nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]) ++ [ pkgs.cargo-nextest ];
             }
           );
-          inherit (tests) test-pipeline-stages test-cli test-cli-equivalence;
+          inherit (tests) test-pipeline-stages-bfragilis test-cli-bfragilis test-cli-equivalence-bfragilis;
           inherit dockerTest;
           # End-to-end recursive equivalence: f64-patched C++ vs Rust on
           # downsampled CAMI (5000 contigs, depth-5 recursion). Asserts

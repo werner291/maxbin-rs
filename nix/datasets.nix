@@ -5,9 +5,8 @@
 # — re-running a test does not re-download. The hashes ensure that the
 # exact same data is used on every machine.
 #
-# Three datasets of increasing size:
+# Datasets of increasing size:
 #   - B. fragilis:  nf-core/modules MaxBin2 test data (~1 MB, seconds)
-#   - minigut:      nf-core/mag test profile (~10 MB, minutes)
 #   - CAPES_S7:     real metagenome, 25K contigs (~2.5 GB, ~10 minutes)
 #   - CAMI I High:  CAMI challenge benchmark, 39K contigs (~779 MB, ~1-3 hours)
 #   - MetaHIT:      human gut, 60K contigs (~275 MB, ~3 hours confirmed)
@@ -18,8 +17,6 @@ let
   # --- B. fragilis (nf-core/modules test data) ---
   nfcoreBase = "https://raw.githubusercontent.com/nf-core/test-datasets/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina";
 
-  # --- minigut (nf-core/mag test profile) ---
-  minigutBase = "https://raw.githubusercontent.com/nf-core/test-datasets/mag";
 in
 {
   bfragilis = {
@@ -37,20 +34,8 @@ in
     };
   };
 
-  minigut = {
-    contigs = fetchurl {
-      url = "${minigutBase}/assemblies/MEGAHIT-test_minigut.contigs.fa.gz";
-      hash = "sha256-RwB+UtWpnzSty4pgMnMYCUWFbSaj/KmtEt3SmasiHQY=";
-    };
-    reads1 = fetchurl {
-      url = "${minigutBase}/test_data/test_minigut_R1.fastq.gz";
-      hash = "sha256-qQ9NSKMVSIbnKlIhuN1rEVnqCQ5dviBjTpZbTugBFqs=";
-    };
-    reads2 = fetchurl {
-      url = "${minigutBase}/test_data/test_minigut_R2.fastq.gz";
-      hash = "sha256-LxSaPk04SvydNbN3glnBzSTX6i/p+AhUi+JyiyOzUGg=";
-    };
-  };
+  # minigut removed — same B. fragilis sample with contigs in different order.
+  # See nf-core/test-datasets#2000.
 
   capes-s7 = {
     # Real metagenome from nf-core/mag full test profile.

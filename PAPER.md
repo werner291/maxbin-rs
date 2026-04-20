@@ -264,7 +264,6 @@ datasets, with a fifth
 but not yet run:
 
 - **B. fragilis** — nf-core/modules MaxBin2 test data, small and fast.
-- **minigut** — nf-core/mag test profile, multi-organism.
 - **CAPES_S7** — 25,244 contigs, ~2.5 GB reads from ENA.
 - **CAMI I High** — 36,116 contigs, 577 bins. From the
   [CAMI challenge](https://doi.org/10.1038/nmeth.4458) ([Sczyrba et al., 2017](https://doi.org/10.1038/nmeth.4458)).
@@ -300,8 +299,8 @@ so every change from the original is auditable.
 
 ### Equivalence
 
-All pipeline stage tests pass on all four tested datasets (B. fragilis,
-minigut, CAPES_S7, CAMI I High). At the component level, 109 tests
+All pipeline stage tests pass on all tested datasets (B. fragilis,
+CAPES_S7, CAMI I High). At the component level, 109 tests
 pass — proptest equivalence, inline FFI tests, and CLI parsing tests.
 
 To reproduce:
@@ -311,10 +310,9 @@ To reproduce:
 nix develop -c cargo nextest run
 
 # Pipeline stage tests per dataset
-nix run .#test-pipeline-stages         # B. fragilis (~1 min)
-nix run .#test-pipeline-stages-minigut # minigut (~2 min)
-nix run .#test-pipeline-stages-capes   # CAPES_S7 (~10 min)
-nix run .#test-pipeline-stages-cami    # CAMI I High (~50 min)
+nix run .#test-pipeline-stages-bfragilis # B. fragilis (~1 min)
+nix run .#test-pipeline-stages-capes     # CAPES_S7 (~10 min)
+nix run .#test-pipeline-stages-cami      # CAMI I High (~50 min)
 ```
 
 The pipeline stage tests verify:

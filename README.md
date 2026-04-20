@@ -125,7 +125,7 @@ described in detail in [PAPER.md](PAPER.md). In short:
 - **Per-stage tests** compare each pipeline stage independently against
   the original MaxBin2 on multiple datasets:
   ```bash
-  nix build .#test-pipeline-stages       # B. fragilis (~1 min)
+  nix build .#test-pipeline-stages-bfragilis  # B. fragilis (~1 min)
   nix build .#test-pipeline-stages-cami  # CAMI I High, 36K contigs (~50 min)
   ```
 - **End-to-end tests** run the full pipeline (including recursive
