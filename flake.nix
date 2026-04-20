@@ -96,6 +96,11 @@
         # Gene caller used by MaxBin2 (see nix/fraggenescan.nix for build details).
         fraggenescan = pkgs.callPackage ./nix/fraggenescan.nix { };
 
+        # Rust reimplementation of FragGeneScan (see nix/fraggenescan-rs.nix).
+        fraggenescan-rs = pkgs.callPackage ./nix/fraggenescan-rs.nix {
+          inherit rustPlatform;
+        };
+
         # Upstream MaxBin2 source tarball — used in two places:
         #   1. nix/maxbin2.nix builds the original MaxBin2 from it
         #   2. build.rs extracts C++ source from it for FFI equivalence testing
@@ -149,6 +154,13 @@
             postInstall = ''
               cp ${maxbin2}/libexec/maxbin2/marker.hmm $out/bin/
               cp ${maxbin2}/libexec/maxbin2/bacar_marker.hmm $out/bin/
+
+              # FragGeneScanRs training data — same files as the original FragGeneScan.
+              # Resolved by the binary via ../share/FragGeneScanRs/train/ relative
+              # to the bin directory.
+              mkdir -p $out/share/FragGeneScanRs
+              ln -s ${fraggenescan}/libexec/FragGeneScan/train $out/share/FragGeneScanRs/train
+
               wrapProgram $out/bin/maxbin-rs \
                 --prefix PATH : "${
                   pkgs.lib.makeBinPath [
@@ -292,6 +304,8 @@
             maxbin2-f64-trace
             maxbin-rs
             maxbin-rs-lto
+            fraggenescan
+            fraggenescan-rs
             rust
             ;
           inherit (pkgs) cargo-nextest;
@@ -340,6 +354,7 @@
             maxbin-rs
             maxbin2
             fraggenescan
+            fraggenescan-rs
             dockerImage
             dockerTest
             ;
@@ -369,6 +384,9 @@
             bench-components
             bench-cpp-lto
             disasm-em
+            bench-genecaller
+            bench-genecaller-minigut
+            bench-genecaller-capes
             ;
         };
 

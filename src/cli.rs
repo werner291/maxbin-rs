@@ -136,6 +136,9 @@ pub struct PipelineArgs {
     /// HMMER will run on this file instead of calling FragGeneScan.
     #[arg(long)]
     pub faa: Option<PathBuf>,
+    /// Use the original C FragGeneScan instead of FragGeneScanRs for gene calling.
+    #[arg(long)]
+    pub legacy_fraggenescan: bool,
     #[arg(long)]
     pub plotmarker: bool,
     #[arg(long)]

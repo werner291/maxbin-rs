@@ -458,14 +458,25 @@ fn run_pipeline_inner(
         eprintln!("  {} hits", hmm_hit_count);
         user_hmmout.clone()
     } else {
-        // Step 3: Gene calling — use provided .faa or run FragGeneScan
+        // Step 3: Gene calling — use provided .faa or run gene caller
         let faa = if let Some(ref user_faa) = cli.faa {
             eprintln!("Using pre-computed protein FASTA: {}", user_faa.display());
             user_faa.clone()
-        } else {
-            eprintln!("Running FragGeneScan...");
+        } else if cli.legacy_fraggenescan {
+            eprintln!("Running FragGeneScan (legacy)...");
             let prefix = work.fgs_output_prefix();
             crate::external::run_fraggenescan(&filtered_contigs, &prefix, cli.thread)?;
+            work.fgs_faa()
+        } else {
+            let train_dir = resolve_fgsrs_train_dir()?;
+            eprintln!("Running FragGeneScanRs (train: {})...", train_dir.display());
+            let prefix = work.fgs_output_prefix();
+            crate::external::run_fraggenescan_rs(
+                &filtered_contigs,
+                &prefix,
+                cli.thread,
+                &train_dir,
+            )?;
             work.fgs_faa()
         };
 
@@ -1360,6 +1371,41 @@ fn extract_contig_name(gene_id: &str) -> String {
         // Fallback: return the whole thing
         gene_id.to_string()
     }
+}
+
+/// Locate the FragGeneScanRs training data directory.
+///
+/// Resolution order:
+///   1. FRAGGENESCAN_TRAIN_DIR env var (explicit override)
+///   2. ../share/FragGeneScanRs/train/ relative to the binary (Nix layout)
+///   3. train/ relative to the binary (cargo install / development layout)
+fn resolve_fgsrs_train_dir() -> Result<PathBuf, String> {
+    if let Ok(dir) = std::env::var("FRAGGENESCAN_TRAIN_DIR") {
+        let p = PathBuf::from(&dir);
+        if p.is_dir() {
+            return Ok(p);
+        }
+        return Err(format!("FRAGGENESCAN_TRAIN_DIR={dir} is not a directory"));
+    }
+
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(bin_dir) = exe.parent()
+    {
+        // Nix layout: bin/../share/FragGeneScanRs/train/
+        let nix_path = bin_dir.join("../share/FragGeneScanRs/train");
+        if nix_path.is_dir() {
+            return Ok(nix_path);
+        }
+        // Development layout: bin/train/
+        let dev_path = bin_dir.join("train");
+        if dev_path.is_dir() {
+            return Ok(dev_path);
+        }
+    }
+
+    Err("Could not find FragGeneScanRs training data. \
+         Set FRAGGENESCAN_TRAIN_DIR or use --faa to skip gene calling."
+        .into())
 }
 
 #[cfg(test)]

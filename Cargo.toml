@@ -6,7 +6,9 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
 flate2 = "1.1.9"
+frag_gene_scan_rs = "1.1.0"
 rayon = "1.10"
+seq_io = "0.3"
 tempfile = "3"
 
 [build-dependencies]

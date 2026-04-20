@@ -497,6 +497,64 @@ fi
 echo ""
 
 # =========================================================================
+# 10. FragGeneScanRs integration (full pipeline with built-in gene caller)
+# =========================================================================
+echo "--- 10. FragGeneScanRs integration ---"
+
+D="$WORK/fgsrs"
+mkdir -p "$D"
+FGSRS_STDERR="$D/stderr.log"
+
+# Run the full pipeline using FGSrs (the default gene caller).
+# This exercises: filter → FGSrs gene calling → HMMER → seeds → EM.
+# We only check that it produces bins, not that they match the original
+# (FGSrs output diverges slightly from the original FragGeneScan).
+if maxbin-rs pipeline --contig "$CONTIGS" --abund "$INTERMEDIATES/abund" \
+     --out "$D/out" 2>"$FGSRS_STDERR"; then
+  D="$D/out"
+
+  # 10.1 produced at least one bin
+  BIN_COUNT=$(find "$D" -name '*.fasta' | wc -l)
+  if [ "$BIN_COUNT" -ge 1 ]; then
+    pass "10.1 FGSrs pipeline produced $BIN_COUNT bin(s)"
+  else
+    fail "10.1 FGSrs pipeline produced no bins"
+  fi
+
+  # 10.2 summary file exists
+  assert_file_nonempty "$D/summary" "10.2 summary exists"
+
+  # 10.3 noclass file exists
+  assert_file_exists "$D/noclass" "10.3 noclass exists"
+
+  # 10.4 stderr mentions FragGeneScanRs (not legacy FragGeneScan)
+  if grep -q "FragGeneScanRs" "$FGSRS_STDERR"; then
+    pass "10.4 used FragGeneScanRs (not legacy)"
+  else
+    fail "10.4 stderr does not mention FragGeneScanRs"
+  fi
+
+  # 10.5 all bin files are valid FASTA
+  ALL_VALID=1
+  for f in "$D"/*.fasta; do
+    FIRST_CHAR=$(head -c1 "$f")
+    if [ "$FIRST_CHAR" != ">" ]; then
+      fail "10.5 $f does not start with >"
+      ALL_VALID=0
+    fi
+  done
+  if [ "$ALL_VALID" = 1 ]; then
+    pass "10.5 all FGSrs bin files are valid FASTA"
+  fi
+else
+  fail "10.1 FGSrs pipeline failed (exit $?)"
+  echo "  stderr:" >&2
+  cat "$FGSRS_STDERR" >&2
+fi
+
+echo ""
+
+# =========================================================================
 # Summary
 # =========================================================================
 echo "============================================"

@@ -37,6 +37,23 @@
   doesn't distinguish generated files from user inputs. Live bug, fixed by v0.3
   work-dir approach.
 
+### FragGeneScanRs divergence
+
+- [ ] FragGeneScanRs v1.1.0 (`b566601`) produces slightly different gene
+  predictions than FragGeneScan 1.30 on the same input. Both use `double`/`f64`
+  — not a precision issue. On B. fragilis (272 contigs), 3 extra genes in FGSrs
+  and ~350 gene IDs differ out of ~1900. The original is deterministic
+  (thread=1). Cause unknown — likely a Viterbi edge case in the reimplementation.
+  The authors don't document any expected divergence.
+  [FragGeneScanRs repo](https://github.com/unipept/FragGeneScanRs)
+
+  Reproduction (`nix run .#bench-genecaller`):
+  ```
+  FragGeneScan:   1895 genes
+  FragGeneScanRs: 1898 genes
+  gene IDs: DIFFER (only in FGS: 353, only in FGSrs: 356)
+  ```
+
 ## Plan
 
 1. **Bioconda package** — submit recipe to bioconda-recipes. Runtime deps

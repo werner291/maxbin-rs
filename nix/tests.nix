@@ -28,6 +28,8 @@
   maxbin2-f64-trace,
   maxbin-rs,
   maxbin-rs-lto,
+  fraggenescan,
+  fraggenescan-rs,
   rust,
   cargo-nextest,
   datasets,
@@ -505,4 +507,47 @@ in
         echo "=== Results ==="
         cat $out/comparison.txt
       '';
+
+  # Gene caller benchmark: FragGeneScan (C) vs FragGeneScanRs (Rust).
+  # Compares wall-clock time and output on assembled contigs.
+  #   nix run .#bench-genecaller              — B. fragilis (small, seconds)
+  #   nix run .#bench-genecaller-minigut      — minigut (medium, minutes)
+  bench-genecaller = writeShellApplication {
+    name = "bench-genecaller";
+    runtimeInputs = [
+      fraggenescan-rs
+    ];
+    text = ''
+      export CONTIGS="${datasets.bfragilis.contigs}"
+      export TRAIN_DIR="${fraggenescan-rs}/share/FragGeneScanRs/train"
+      export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
+      bash ${../tests/bench-genecaller.sh}
+    '';
+  };
+
+  bench-genecaller-minigut = writeShellApplication {
+    name = "bench-genecaller-minigut";
+    runtimeInputs = [
+      fraggenescan-rs
+    ];
+    text = ''
+      export CONTIGS="${datasets.minigut.contigs}"
+      export TRAIN_DIR="${fraggenescan-rs}/share/FragGeneScanRs/train"
+      export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
+      bash ${../tests/bench-genecaller.sh}
+    '';
+  };
+
+  bench-genecaller-capes = writeShellApplication {
+    name = "bench-genecaller-capes";
+    runtimeInputs = [
+      fraggenescan-rs
+    ];
+    text = ''
+      export CONTIGS="${datasets.capes-s7.contigs}"
+      export TRAIN_DIR="${fraggenescan-rs}/share/FragGeneScanRs/train"
+      export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
+      bash ${../tests/bench-genecaller.sh}
+    '';
+  };
 }

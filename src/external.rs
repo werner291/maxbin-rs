@@ -18,10 +18,100 @@
 //! - The original resolves tool paths via a hand-written `setting` file with
 //!   manual absolute paths — a constant source of user pain (Biostars #9473674).
 //!   We find tools on $PATH instead.
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Run FragGeneScan on a contig file to predict genes.
+/// Run FragGeneScanRs (Rust library) on a contig file to predict genes.
+/// Produces {out_prefix}.frag.faa (amino acid FASTA).
+///
+/// This calls the FragGeneScanRs library directly — no subprocess, no Perl
+/// wrapper. The training data directory must contain the standard FGS training
+/// files (complete, gene, rgene, noncoding, start, stop, start1, stop1, pwm).
+pub fn run_fraggenescan_rs(
+    contig: &Path,
+    out_prefix: &str,
+    threads: usize,
+    train_dir: &Path,
+) -> Result<(), String> {
+    use frag_gene_scan_rs::dna::{Nuc, count_cg_content};
+    use frag_gene_scan_rs::hmm;
+    use frag_gene_scan_rs::viterbi::viterbi;
+    use std::io::Write;
+
+    let (global, locals) =
+        hmm::get_train_from_file(train_dir.to_path_buf(), PathBuf::from("complete")).map_err(
+            |e| {
+                format!(
+                    "Failed to load FGSrs training data from {}: {e}",
+                    train_dir.display()
+                )
+            },
+        )?;
+
+    let faa_path = format!("{out_prefix}.frag.faa");
+    let mut faa_out = std::io::BufWriter::new(
+        std::fs::File::create(&faa_path).map_err(|e| format!("Can't create {faa_path}: {e}"))?,
+    );
+
+    let file = std::fs::File::open(contig).map_err(|e| format!("Can't open contig file: {e}"))?;
+    let reader = seq_io::fasta::Reader::new(file);
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .map_err(|e| format!("Failed to create thread pool: {e}"))?;
+
+    // Collect predictions in order (matching original FGS output ordering).
+    let records: Vec<_> = reader
+        .into_records()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("FASTA parse error: {e}"))?;
+
+    let predictions: Vec<Vec<u8>> = pool.install(|| {
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        records
+            .into_par_iter()
+            .map(|record| {
+                let head: Vec<u8> = record
+                    .head
+                    .iter()
+                    .copied()
+                    .take_while(u8::is_ascii_graphic)
+                    .collect();
+                let nseq: Vec<Nuc> = record.seq.iter().copied().map(Nuc::from).collect();
+                let mut buf = Vec::new();
+                if !nseq.is_empty() {
+                    let prediction = viterbi(
+                        &global,
+                        &locals[count_cg_content(&nseq)],
+                        head,
+                        nseq,
+                        false, // complete=0: short reads / contigs, not whole genome
+                    );
+                    // Ignore error — matches FGSrs binary behavior
+                    let _ = prediction.protein(&mut buf, false);
+                }
+                buf
+            })
+            .collect()
+    });
+
+    for buf in predictions {
+        faa_out
+            .write_all(&buf)
+            .map_err(|e| format!("Write error: {e}"))?;
+    }
+    faa_out.flush().map_err(|e| format!("Flush error: {e}"))?;
+
+    if !Path::new(&faa_path).exists() {
+        return Err(format!(
+            "FragGeneScanRs produced no output ({faa_path} not found)"
+        ));
+    }
+    Ok(())
+}
+
+/// Run FragGeneScan (original C) on a contig file to predict genes.
 /// Produces {out_prefix}.frag.faa (amino acid FASTA).
 ///
 /// Matches run_MaxBin.pl:~440-460:
