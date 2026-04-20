@@ -127,6 +127,11 @@
         maxbin2-f64-trace = maxbin2-f64.overrideAttrs (old: {
           patches = (old.patches or [ ]) ++ [ tracePatch ];
         });
+        # MaxBin2 with per-stage timing output (timing.json).
+        timingPatch = ./nix/maxbin2-timing.patch;
+        maxbin2-timing = maxbin2.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ timingPatch ];
+        });
 
         # EM-only binary — no external tool dependencies.
         # Supports `em`, `filter`, and `seeds` subcommands only.
@@ -329,6 +334,71 @@
           };
         };
 
+        # Pipeline timing chart — maxbin-rs vs original MaxBin2 on CAPES_S7.
+        #   nix build .#bench-chart
+        bench-chart =
+          pkgs.runCommand "bench-chart"
+            {
+              nativeBuildInputs = [
+                maxbin-rs
+                maxbin2-timing
+                (pkgs.python3.withPackages (ps: [
+                  ps.matplotlib
+                  ps.numpy
+                ]))
+              ];
+            }
+            ''
+              export MAXBIN_RS_DETERMINISTIC=1
+              export HOME=$(mktemp -d)
+              mkdir -p $out
+
+              CONTIGS="${datasets.capes-s7.contigs}"
+              ABUND="${intermediates.capes}/abund"
+
+              # --- maxbin-rs (1 thread) ---
+              echo "Running maxbin-rs (1 thread)..."
+              DIR=$(mktemp -d)
+              maxbin-rs pipeline --contig "$CONTIGS" --abund "$ABUND" \
+                --out "$DIR/out" --thread 1 2>/dev/null
+              cp "$DIR/out/timing.json" "$out/maxbin-rs-t1.json"
+              rm -rf "$DIR"
+
+              # --- maxbin-rs (4 threads) ---
+              echo "Running maxbin-rs (4 threads)..."
+              DIR=$(mktemp -d)
+              maxbin-rs pipeline --contig "$CONTIGS" --abund "$ABUND" \
+                --out "$DIR/out" --thread 4 2>/dev/null
+              cp "$DIR/out/timing.json" "$out/maxbin-rs-t4.json"
+              rm -rf "$DIR"
+
+              # --- Original MaxBin2 (1 thread) ---
+              echo "Running original MaxBin2 (1 thread)..."
+              DIR=$(mktemp -d)
+              run_MaxBin.pl -contig "$CONTIGS" -abund "$ABUND" \
+                -out "$DIR/test" -thread 1 || true
+              ls "$DIR/" "$DIR/test"* || true
+              cp "$DIR/test.timing.json" "$out/maxbin2-t1.json"
+              rm -rf "$DIR"
+
+              # --- Original MaxBin2 (4 threads) ---
+              echo "Running original MaxBin2 (4 threads)..."
+              DIR=$(mktemp -d)
+              run_MaxBin.pl -contig "$CONTIGS" -abund "$ABUND" \
+                -out "$DIR/test" -thread 4 || true
+              cp "$DIR/test.timing.json" "$out/maxbin2-t4.json"
+              rm -rf "$DIR"
+
+              echo "Generating chart..."
+              python3 ${./scripts/chart-timing.py} "$out/timing.png" \
+                "maxbin-rs t=1=$out/maxbin-rs-t1.json" \
+                "MaxBin2 t=1=$out/maxbin2-t1.json" \
+                "maxbin-rs t=4=$out/maxbin-rs-t4.json" \
+                "MaxBin2 t=4=$out/maxbin2-t4.json"
+
+              echo "Chart: $out/timing.png"
+            '';
+
         # NixOS VM test — run the Docker image on real data.
         dockerTest = import ./nix/docker-test.nix {
           inherit pkgs dockerImage datasets;
@@ -345,6 +415,7 @@
             maxbin2
             fraggenescan
             fraggenescan-rs
+            bench-chart
             dockerImage
             dockerTest
             ;
@@ -370,6 +441,7 @@
             bench-genecaller-capes
             bench-pipeline-bfragilis
             bench-pipeline-capes
+            bench-pipeline-capes-reads
             ;
         };
 

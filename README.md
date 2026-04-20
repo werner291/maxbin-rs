@@ -124,8 +124,17 @@ described in detail in [PAPER.md](PAPER.md). In short:
   original C++ via FFI on randomized inputs (`cargo nextest run`).
 - **End-to-end tests** run the full pipeline (including recursive
   binning) on CAMI I High: all bins byte-identical.
-- The EM core is approximately **8x faster** than the original C++
-  (see PAPER.md for methodology).
+- The EM core is approximately **5x faster** than the original C++.
+  Gene calling uses FragGeneScanRs (Rust library) instead of shelling
+  out to FragGeneScan (C + Perl), roughly halving pipeline time on
+  pre-computed abundance.
+
+![Pipeline timing: maxbin-rs vs MaxBin2 on CAPES_S7 (25K contigs)](doc/timing.png)
+
+CAPES_S7, pre-computed abundance, AMD Ryzen 9 7940HS.
+When using raw reads instead of abundance, Bowtie2 read mapping
+dominates (~32 min single-threaded on CAPES_S7 vs ~45s for everything
+else). Regenerate: `nix build .#bench-chart`
 
 These results have not been independently verified. If you do run your
 own comparison, we'd welcome the feedback.

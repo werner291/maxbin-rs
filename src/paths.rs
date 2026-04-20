@@ -65,6 +65,10 @@ impl OutputDir {
         self.dir.join("marker")
     }
 
+    pub fn timing_json(&self) -> PathBuf {
+        self.dir.join("timing.json")
+    }
+
     pub fn log(&self) -> PathBuf {
         self.dir.join("log")
     }

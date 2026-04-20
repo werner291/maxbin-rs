@@ -7,7 +7,8 @@
 #
 # Environment variables (set by the Nix wrapper):
 #   CONTIGS    — input contig FASTA file (may be gzipped)
-#   ABUND      — pre-computed abundance file
+#   ABUND      — pre-computed abundance file (optional if READS is set)
+#   READS      — reads file(s), space-separated (optional if ABUND is set)
 #   THREADS    — thread count (default: 1)
 
 set -euo pipefail
@@ -28,16 +29,28 @@ num_contigs=$(grep -c '^>' "$CONTIGS")
 echo "=== maxbin-rs Pipeline Benchmark ==="
 echo "  contigs: $num_contigs"
 echo "  threads: $THREADS"
+if [ -n "${ABUND:-}" ]; then
+    echo "  mode:    pre-computed abundance"
+else
+    echo "  mode:    reads → Bowtie2 → abundance"
+    echo "  reads:   ${READS}"
+fi
 echo ""
 
 export MAXBIN_RS_DETERMINISTIC=1
 
+# Build the command.
+CMD=(maxbin-rs pipeline --contig "$CONTIGS" --out "$WORK/out" --thread "$THREADS")
+if [ -n "${ABUND:-}" ]; then
+    CMD+=(--abund "$ABUND")
+else
+    for r in $READS; do
+        CMD+=(--reads "$r")
+    done
+fi
+
 START=$(date +%s%N)
-maxbin-rs pipeline \
-    --contig "$CONTIGS" \
-    --abund "$ABUND" \
-    --out "$WORK/out" \
-    --thread "$THREADS" 2>&1
+"${CMD[@]}" 2>&1
 END=$(date +%s%N)
 
 TOTAL_MS=$(( (END - START) / 1000000 ))

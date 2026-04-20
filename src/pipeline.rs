@@ -375,6 +375,29 @@ pub fn run_sam_to_abund(args: &SamToAbundArgs) -> Result<(), String> {
     Ok(())
 }
 
+/// Per-stage wall-clock timing, written to `timing.json` in the output directory.
+#[derive(Default, serde::Serialize)]
+struct PipelineTiming {
+    filter_s: f64,
+    bowtie2_s: f64,
+    genecall_s: f64,
+    hmmer_s: f64,
+    recursive_em_s: f64,
+}
+
+impl PipelineTiming {
+    fn write_json(&self, path: &Path) {
+        match serde_json::to_string_pretty(self) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(path, json) {
+                    eprintln!("Warning: could not write timing.json: {e}");
+                }
+            }
+            Err(e) => eprintln!("Warning: could not serialize timing: {e}"),
+        }
+    }
+}
+
 /// Run the full pipeline.
 pub fn run_pipeline(cli: &PipelineArgs) -> Result<(), String> {
     eprintln!("maxbin-rs {}", env!("CARGO_PKG_VERSION"));
@@ -402,6 +425,8 @@ fn run_pipeline_inner(
     output: &crate::paths::OutputDir,
     work: &crate::paths::WorkDir,
 ) -> Result<(), String> {
+    let mut timing = PipelineTiming::default();
+
     // Step 1: Filter contigs
     eprintln!(
         "Filtering contigs shorter than {} bp...",
@@ -409,18 +434,21 @@ fn run_pipeline_inner(
     );
     let filtered_contigs = work.filtered_contigs();
     let tooshort_path = work.tooshort();
+    let t = std::time::Instant::now();
     filter_contigs(
         &cli.contig,
         &filtered_contigs,
         &tooshort_path,
         cli.min_contig_length,
     )?;
+    timing.filter_s = t.elapsed().as_secs_f64();
 
     // Step 2: Resolve abundance files
     let mut abund_files = cli.all_abund_files().map_err(|e| e.to_string())?;
     let reads_files = cli.all_reads_files().map_err(|e| e.to_string())?;
 
     if !reads_files.is_empty() {
+        let t = std::time::Instant::now();
         eprintln!("Building Bowtie2 index...");
         let idx_prefix = work.bowtie2_index_prefix();
         crate::external::bowtie2_build(&cli.contig, &idx_prefix)?;
@@ -440,6 +468,7 @@ fn run_pipeline_inner(
             compute_abundance_from_sam(&sam_path, &abund_path)?;
             abund_files.push(abund_path);
         }
+        timing.bowtie2_s = t.elapsed().as_secs_f64();
     }
 
     if abund_files.is_empty() {
@@ -459,6 +488,7 @@ fn run_pipeline_inner(
         user_hmmout.clone()
     } else {
         // Step 3: Gene calling — use provided .faa or run gene caller
+        let t = std::time::Instant::now();
         let faa = if let Some(ref user_faa) = cli.faa {
             eprintln!("Using pre-computed protein FASTA: {}", user_faa.display());
             user_faa.clone()
@@ -479,8 +509,10 @@ fn run_pipeline_inner(
             )?;
             work.fgs_faa()
         };
+        timing.genecall_s = t.elapsed().as_secs_f64();
 
         // Step 4: HMMER marker gene search
+        let t = std::time::Instant::now();
         let hmmout_path = work.hmmout();
         eprintln!(
             "Running HMMER hmmsearch (marker HMM: {})...",
@@ -492,10 +524,12 @@ fn run_pipeline_inner(
             .map(|s| s.lines().filter(|l| !l.starts_with('#')).count())
             .unwrap_or(0);
         eprintln!("  HMMER produced {} hits", hmm_hit_count);
+        timing.hmmer_s = t.elapsed().as_secs_f64();
         hmmout_path
     };
 
-    // Step 5: Recursive binning
+    // Step 5: Recursive binning (seeds + EM, possibly multiple rounds)
+    let t_recursive = std::time::Instant::now();
     // Matches run_MaxBin.pl:467-579: BFS loop that re-seeds and re-bins each
     // output bin until no more splits are found or recursion depth is reached.
     //
@@ -767,6 +801,9 @@ fn run_pipeline_inner(
         writeln!(log, "Output: {}", output.dir().display()).map_err(|e| e.to_string())?;
         writeln!(log, "Bins: {bin_count}").map_err(|e| e.to_string())?;
     }
+
+    timing.recursive_em_s = t_recursive.elapsed().as_secs_f64();
+    timing.write_json(&output.timing_json());
 
     eprintln!("\n========== Job finished ==========");
     Ok(())

@@ -1,0 +1,99 @@
+--- a/run_MaxBin.pl
++++ b/run_MaxBin.pl
+@@ -3,11 +3,16 @@
+ use Cwd;
+ use LWP::Simple;
+ use FindBin qw($Bin);
++use Time::HiRes qw(gettimeofday tv_interval);
+ 
+ my $currdir = getcwd;
+ 
+ my $VERSION_NUM = "2.2.7";
+ 
++# Per-stage timing (written to timing.json at the end)
++our $timing_genecall = 0;
++our $timing_hmmer = 0;
++
+ require("$Bin\/_getmarker.pl");
+ require("$Bin\/_getabund.pl");
+ require("$Bin\/_sepReads.pl");
+@@ -363,6 +368,7 @@
+ 		exit;
+ 	}
+ 
++	my $t_stage = [gettimeofday];
+ 	$new_contig = checkContig($contig_f, $MIN_SEQ_LENGTH, "$out_f.contig.tmp", "$out_f.tooshort");
+ 	if ($new_contig ne "")
+ 	{
+@@ -370,6 +376,8 @@
+ 		$contig_f = $new_contig;
+ 		$remodel_contig = 1;
+ 	}
++	my $timing_filter = tv_interval($t_stage);
++	$t_stage = [gettimeofday];
+ 
+ 	$param = "";
+ 	$j = 1;
+@@ -453,6 +461,8 @@
+ 	$currnum = 0;
+ 	$maxnum = 1;
+ 
++	my $timing_bowtie2 = tv_interval($t_stage);
++
+ 	# Run HMMER3 to identify seed contigs
+ 	writeLOG("Searching against $MARKERNUM marker genes to find starting seed contigs for [$contig_name]...\n");
+ 	if (!(-e "$contig_f.hmmout.$FINISH"))
+@@ -464,6 +474,8 @@
+ 		getHMM($contig_f, "$contig_f.hmmout");
+ 		touch("$contig_f.hmmout.$FINISH");
+ 	}
++	# $timing_genecall and $timing_hmmer set inside getHMM (package globals)
++	$t_stage = [gettimeofday];
+ 
+ 	while ($currnum < $maxnum)
+ 	{
+@@ -976,6 +988,19 @@
+ 			writeLOG("Store abundance information of reads file \[$reads_f[$i]\] in \[$tmp\].\n");
+ 		}
+ 	}
++	my $timing_recursive_em = tv_interval($t_stage);
++
++	if (open(my $tfh, ">", "$out_f.timing.json")) {
++		print $tfh "{\n";
++		print $tfh "  \"filter_s\": $timing_filter,\n";
++		print $tfh "  \"bowtie2_s\": $timing_bowtie2,\n";
++		print $tfh "  \"genecall_s\": $timing_genecall,\n";
++		print $tfh "  \"hmmer_s\": $timing_hmmer,\n";
++		print $tfh "  \"recursive_em_s\": $timing_recursive_em\n";
++		print $tfh "}\n";
++		close($tfh);
++	}
++
+ 	writeLOG("\n\n========== Elapsed Time ==========\n");
+ 	$endtime = time();
+ 	$line = getElapsedTime($endtime - $starttime);
+@@ -1037,6 +1062,7 @@
+ 	my $cutmethod = $_[2];
+ 	my $cmd;
+ 
++	my $t_gc = [gettimeofday];
+ 	if (!(-e "$contig_f.frag.faa"))
+ 	{
+ 		print "Running FragGeneScan....\n";
+@@ -1073,6 +1099,8 @@
+ 	}
+ =cut
+ 
++	$timing_genecall = tv_interval($t_gc);
++	my $t_hm = [gettimeofday];
+ 	print "Running HMMER hmmsearch....\n";
+ 	if ($MARKERNUM == 107)
+ 	{
+@@ -1101,6 +1129,7 @@
+ 		unlink("$out_f.out");
+ 		unlink("$out_f.err");
+ 	}
++	$timing_hmmer = tv_interval($t_hm);
+ 	#unlink("$contig_f.frag.faa");
+ 	unlink("$contig_f.frag.ffn");
+ 	unlink("$contig_f.frag.out");

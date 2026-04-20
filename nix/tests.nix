@@ -482,4 +482,16 @@ in
       bash ${../tests/bench-pipeline.sh}
     '';
   };
+
+  # Full pipeline including Bowtie2 read mapping (no pre-computed abundance).
+  bench-pipeline-capes-reads = writeShellApplication {
+    name = "bench-pipeline-capes-reads";
+    runtimeInputs = [ maxbin-rs ];
+    text = ''
+      export CONTIGS="${datasets.capes-s7.contigs}"
+      export READS="${datasets.capes-s7.reads1} ${datasets.capes-s7.reads2}"
+      bash ${../tests/bench-pipeline.sh}
+    '';
+  };
+
 }
