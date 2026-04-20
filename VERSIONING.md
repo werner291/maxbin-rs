@@ -37,10 +37,11 @@ Changes so far:
 Each breaking change is documented with motivation — why the old
 behavior was wrong, not just what changed.
 
-### v0.3+ — New features
+### v0.3.x — Internalized dependencies, interface changes
 
-Prodigal gene caller, GTDB markers, parallelized outer loop, etc.
-Version numbers TBD when we get there.
+External tool dependencies replaced by library calls where possible.
+Output directory layout changes. Previous behavior recoverable via
+explicit flags (e.g. `--legacy-fraggenescan`).
 
 ## Branching
 
