@@ -368,6 +368,8 @@
             disasm-em
             bench-genecaller-bfragilis
             bench-genecaller-capes
+            bench-pipeline-bfragilis
+            bench-pipeline-capes
             ;
         };
 

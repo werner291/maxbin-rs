@@ -459,4 +459,27 @@ in
       bash ${../tests/bench-genecaller.sh}
     '';
   };
+
+  # Full pipeline benchmark (maxbin-rs only, no comparison against original).
+  #   nix run .#bench-pipeline-bfragilis     — B. fragilis (seconds)
+  #   nix run .#bench-pipeline-capes         — CAPES_S7 (minutes)
+  bench-pipeline-bfragilis = writeShellApplication {
+    name = "bench-pipeline-bfragilis";
+    runtimeInputs = [ maxbin-rs ];
+    text = ''
+      export CONTIGS="${datasets.bfragilis.contigs}"
+      export ABUND="${intermediates.bfragilis}/abund"
+      bash ${../tests/bench-pipeline.sh}
+    '';
+  };
+
+  bench-pipeline-capes = writeShellApplication {
+    name = "bench-pipeline-capes";
+    runtimeInputs = [ maxbin-rs ];
+    text = ''
+      export CONTIGS="${datasets.capes-s7.contigs}"
+      export ABUND="${intermediates.capes}/abund"
+      bash ${../tests/bench-pipeline.sh}
+    '';
+  };
 }
