@@ -8,6 +8,7 @@ maxbin-core = { path = "../maxbin-core" }
 clap = { version = "4.6.1", features = ["derive"] }
 flate2 = "1.1.9"
 frag_gene_scan_rs = "1.1.0"
+libm = "0.2"
 rayon = "1.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

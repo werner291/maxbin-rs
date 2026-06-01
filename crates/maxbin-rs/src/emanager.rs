@@ -127,15 +127,14 @@ pub fn get_prob_abund(curr_abund: f64, lambda: f64) -> f64 {
     }
 }
 
-/// C's lgamma function (log of gamma function).
+/// Log of the gamma function.
+///
+/// Previously linked the system `lgamma` via `extern "C"`, which does not exist
+/// on wasm. `libm::lgamma` is a pure-Rust port of musl's libm, so it carries no
+/// libc dependency and compiles for wasm32. See the commit that introduced this
+/// for the measured output impact versus the system `lgamma`.
 fn lgamma(x: f64) -> f64 {
-    // Use libc's lgamma via the extern
-    unsafe { libc_lgamma(x) }
-}
-
-unsafe extern "C" {
-    #[link_name = "lgamma"]
-    fn libc_lgamma(x: f64) -> f64;
+    libm::lgamma(x)
 }
 
 /// Initialize EM state from input files and seed contig names.
