@@ -20,6 +20,7 @@
   maxbin2-trace,
   maxbin2-f64-trace,
   maxbin-rs,
+  maxbin-rs-em,
   maxbin-rs-cpp-em,
   maxbin-rs-cpp-em-lto,
   fraggenescan,
@@ -344,28 +345,33 @@ in
           echo "  $label: $total lines, $calls calls, $vector vector, $scalar scalar"
         }
 
-        # disasm_variant BINARY OUTDIR VARIANT_LABEL
-        # Disassemble all four EM hot functions from BINARY into OUTDIR.
+        # disasm_variant CPP_BINARY RUST_BINARY OUTDIR VARIANT_LABEL
+        # Disassemble the four EM hot functions into OUTDIR. The C++ functions
+        # come from CPP_BINARY (the cpp-em binary, which is what the standard
+        # vs LTO A/B varies); the Rust functions come from RUST_BINARY. They
+        # have to be pulled from different binaries: the cpp-em binary never
+        # calls the Rust EM, so those symbols are dead-code-eliminated from it,
+        # while the maxbin-rs binary carries no C++ EManager at all.
         disasm_variant() {
-          local binary="$1" outdir="$2" label="$3"
+          local cpp_binary="$1" rust_binary="$2" outdir="$3" label="$4"
           mkdir -p "$outdir"
 
-          disasm_function "$binary" \
+          disasm_function "$cpp_binary" \
             'T EManager::run_EM\(int\)$' \
             "$outdir/cpp-run_EM.s" \
             "$label — C++ EManager::run_EM(int)"
 
-          disasm_function "$binary" \
+          disasm_function "$cpp_binary" \
             'EManager::get_prob_abund\(double,? ?double\)' \
             "$outdir/cpp-get_prob_abund.s" \
             "$label — C++ EManager::get_prob_abund(double, double)"
 
-          disasm_function "$binary" \
+          disasm_function "$rust_binary" \
             'T maxbin_rs.*emanager.*run_em$' \
             "$outdir/rust-run_em.s" \
             "$label — Rust run_em"
 
-          disasm_function "$binary" \
+          disasm_function "$rust_binary" \
             't maxbin_rs.*emanager.*compute_abund_prob_for_contig$' \
             "$outdir/rust-compute_abund.s" \
             "$label — Rust compute_abund_prob_for_contig"
@@ -391,20 +397,27 @@ in
       ''
         ${disasmLib}
 
-        # Both the C++ EManager symbols and the Rust EM symbols are present in
-        # the equivalence crate's cpp-em binary: it links the original MaxBin2
-        # C++ via FFI and depends on the maxbin-rs Rust crate. The two builds
-        # differ only in the C++ FFI: standard vs MAXBIN2_CPP_LTO=1.
+        # The C++ EManager symbols come from the equivalence crate's cpp-em
+        # binary (which links the original MaxBin2 C++ via FFI); the standard
+        # vs LTO A/B varies only this binary (MAXBIN2_CPP_LTO=1). The Rust EM
+        # symbols come from the maxbin-rs binary instead: the cpp-em binary
+        # only calls the C++ EM, so the Rust EM is dead-code-eliminated from
+        # it. The Rust codegen is identical across the two columns (LTO affects
+        # only the C++ FFI), so the same RUST_BIN feeds both.
         STD_BIN="${maxbin-rs-cpp-em}/bin/maxbin-rs-cpp-em"
         LTO_BIN="${maxbin-rs-cpp-em-lto}/bin/maxbin-rs-cpp-em"
+        # maxbin-rs-em is the unwrapped full binary (no wrapProgram shell
+        # wrapper), and its pipeline actually calls the Rust EM, so run_em and
+        # compute_abund_prob_for_contig survive in it.
+        RUST_BIN="${maxbin-rs-em}/bin/maxbin-rs"
 
         mkdir -p $out/standard $out/unity
 
-        echo "Disassembling standard build: $STD_BIN"
-        disasm_variant "$STD_BIN" "$out/standard" "standard"
+        echo "Disassembling standard build: $STD_BIN (Rust from $RUST_BIN)"
+        disasm_variant "$STD_BIN" "$RUST_BIN" "$out/standard" "standard"
 
-        echo "Disassembling unity/LTO build: $LTO_BIN"
-        disasm_variant "$LTO_BIN" "$out/unity" "unity (MAXBIN2_CPP_LTO=1)"
+        echo "Disassembling unity/LTO build: $LTO_BIN (Rust from $RUST_BIN)"
+        disasm_variant "$LTO_BIN" "$RUST_BIN" "$out/unity" "unity (MAXBIN2_CPP_LTO=1)"
 
         # Side-by-side comparison
         {

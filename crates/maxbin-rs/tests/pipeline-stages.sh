@@ -308,10 +308,13 @@ STAGE4_START=$SECONDS
 CPP_DIR=$(mktemp -d)
 RUST_DIR=$(mktemp -d)
 
-# Subcommands: run C++ EM and Rust EM separately. Each reports its own timing.
+# Run C++ EM and Rust EM separately. Each reports its own timing.
+# The C++ EM is the maxbin-rs-cpp-em binary from the maxbin-rs-equivalence
+# crate (it links the original MaxBin2 C++ via FFI); it used to be the
+# `maxbin-rs cpp-em` subcommand before the FFI was split into its own crate.
 # Both use prob_threshold=0.5 to match the C++ FFI's hardcoded default.
 # (Our default changed to 0.9 in v0.2, but the FFI can't be overridden.)
-maxbin-rs cpp-em --contig "$FILTERED_CONTIGS" --abund "$ORIG_ABUND" \
+maxbin-rs-cpp-em --contig "$FILTERED_CONTIGS" --abund "$ORIG_ABUND" \
   --seed "$ORIG_SEED" --out "$CPP_DIR/test" --thread 1
 
 maxbin-rs em --contig "$FILTERED_CONTIGS" --abund "$ORIG_ABUND" \
