@@ -314,6 +314,7 @@
             maxbin2-trace
             maxbin2-f64-trace
             maxbin-rs
+            maxbin-rs-em
             maxbin-rs-cpp-em
             maxbin-rs-cpp-em-lto
             fraggenescan
