@@ -26,15 +26,15 @@ cargo clippy             # lint
 cargo fmt --check        # check formatting
 ```
 
-Shell-based equivalence and integration tests live in `tests/`:
-- `tests/equivalence-e2e.sh` — end-to-end comparison against original MaxBin2
-- `tests/pipeline-trace.sh` — recursive pipeline equivalence (Rust vs C++)
-- `tests/cli-equivalence.sh` / `tests/cli-integration.sh` — CLI behavior
-- `tests/bench-genecaller.sh` — FragGeneScan vs FragGeneScanRs benchmark
+Shell-based equivalence and integration tests live in `crates/maxbin-rs/tests/`:
+- `crates/maxbin-rs/tests/equivalence-e2e.sh` — end-to-end comparison against original MaxBin2
+- `crates/maxbin-rs/tests/pipeline-trace.sh` — recursive pipeline equivalence (Rust vs C++)
+- `crates/maxbin-rs/tests/cli-equivalence.sh` / `crates/maxbin-rs/tests/cli-integration.sh` — CLI behavior
+- `crates/maxbin-rs/tests/bench-genecaller.sh` — FragGeneScan vs FragGeneScanRs benchmark
 
 ## Architecture
 
-### CLI (clap derive, `src/cli.rs`)
+### CLI (clap derive, `crates/maxbin-rs/src/cli.rs`)
 
 Uses standard double-dash flags (`--contig`, `--abund`, etc.). Single-dash compatibility was dropped in v0.2.0. Subcommands expose individual pipeline stages:
 
@@ -45,7 +45,7 @@ Uses standard double-dash flags (`--contig`, `--abund`, etc.). Single-dash compa
 - `maxbin-rs cpp-em` — run the original C++ EM via FFI (equivalence testing only)
 - `maxbin-rs sam-to-abund` — compute abundance from a SAM file
 
-### Key source files
+### Key source files (in `crates/maxbin-rs/src/`)
 
 - `pipeline.rs` — orchestration for each subcommand
 - `emanager.rs` — EM algorithm core (E-step, M-step, convergence)

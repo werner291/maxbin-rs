@@ -2,7 +2,7 @@
 #
 # Each entry here creates a small shell script that:
 #   1. Sets environment variables pointing to Nix-cached test data
-#   2. Runs the actual test script from tests/
+#   2. Runs the actual test script from crates/maxbin-rs/tests/
 #
 # This indirection exists because the test scripts are plain bash (readable
 # without knowing Nix), but they need paths to data in the Nix store —
@@ -31,7 +31,7 @@
 
 let
   # Helper: create a sandboxed CLI integration test for a given dataset.
-  # Runs tests/cli-integration.sh with the binary on PATH and test data
+  # Runs crates/maxbin-rs/tests/cli-integration.sh with the binary on PATH and test data
   # available. Tests flag parsing, subcommands, error cases, and output
   # validation end-to-end.
   mkCliTest =
@@ -55,7 +55,7 @@ let
         export MAXBIN_RS_DETERMINISTIC=1
         export HOME=$(mktemp -d)
 
-        bash ${../tests/cli-integration.sh}
+        bash ${../crates/maxbin-rs/tests/cli-integration.sh}
 
         touch $out
       '';
@@ -83,7 +83,7 @@ let
         export MAXBIN_RS_DETERMINISTIC=1
         export HOME=$(mktemp -d)
 
-        bash ${../tests/cli-equivalence.sh}
+        bash ${../crates/maxbin-rs/tests/cli-equivalence.sh}
 
         touch $out
       '';
@@ -114,7 +114,7 @@ let
         maxbin-rs
       ];
       text = ''
-        bash ${../tests/pipeline-trace.sh} \
+        bash ${../crates/maxbin-rs/tests/pipeline-trace.sh} \
           "${contigs}" \
           "${intermediates'}/abund" \
           "${intermediates'}/hmmout"
@@ -443,7 +443,7 @@ in
       export CONTIGS="${datasets.bfragilis.contigs}"
       export TRAIN_DIR="${fraggenescan-rs}/share/FragGeneScanRs/train"
       export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
-      bash ${../tests/bench-genecaller.sh}
+      bash ${../crates/maxbin-rs/tests/bench-genecaller.sh}
     '';
   };
 
@@ -456,7 +456,7 @@ in
       export CONTIGS="${datasets.capes-s7.contigs}"
       export TRAIN_DIR="${fraggenescan-rs}/share/FragGeneScanRs/train"
       export PATH="${fraggenescan}/libexec/FragGeneScan:$PATH"
-      bash ${../tests/bench-genecaller.sh}
+      bash ${../crates/maxbin-rs/tests/bench-genecaller.sh}
     '';
   };
 
@@ -469,7 +469,7 @@ in
     text = ''
       export CONTIGS="${datasets.bfragilis.contigs}"
       export ABUND="${intermediates.bfragilis}/abund"
-      bash ${../tests/bench-pipeline.sh}
+      bash ${../crates/maxbin-rs/tests/bench-pipeline.sh}
     '';
   };
 
@@ -479,7 +479,7 @@ in
     text = ''
       export CONTIGS="${datasets.capes-s7.contigs}"
       export ABUND="${intermediates.capes}/abund"
-      bash ${../tests/bench-pipeline.sh}
+      bash ${../crates/maxbin-rs/tests/bench-pipeline.sh}
     '';
   };
 
@@ -490,7 +490,7 @@ in
     text = ''
       export CONTIGS="${datasets.capes-s7.contigs}"
       export READS="${datasets.capes-s7.reads1} ${datasets.capes-s7.reads2}"
-      bash ${../tests/bench-pipeline.sh}
+      bash ${../crates/maxbin-rs/tests/bench-pipeline.sh}
     '';
   };
 
