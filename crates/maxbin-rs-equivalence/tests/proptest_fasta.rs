@@ -76,7 +76,7 @@ proptest! {
         }
 
         // Rust parser
-        let rust_records = maxbin_rs::fasta::parse(Cursor::new(input.as_bytes()));
+        let rust_records = maxbin_core::fasta::parse(Cursor::new(input.as_bytes()));
 
         // C++ parser
         let original = maxbin_rs_equivalence::original_ffi::OriginalFastaReader::new(&tmp_path);

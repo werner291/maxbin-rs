@@ -1,8 +1,8 @@
 //! FFI equivalence test for the descending quicksort.
 //!
-//! Compares `maxbin_rs::quicksort::sort_descending` against the original
+//! Compares `maxbin_core::quicksort::sort_descending` against the original
 //! MaxBin2 C++ quickSort. Previously an in-source test in `quicksort.rs`.
-use maxbin_rs::quicksort::sort_descending;
+use maxbin_core::quicksort::sort_descending;
 use maxbin_rs_equivalence::original_ffi::original_quicksort;
 
 #[test]

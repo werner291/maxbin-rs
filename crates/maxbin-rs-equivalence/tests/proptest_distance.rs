@@ -40,10 +40,10 @@ mod distance_proptest {
 
         #[test]
         fn euc_dist_equivalence(seq1 in arb_dna_seq(), seq2 in arb_dna_seq()) {
-            let ctx = maxbin_rs::distance::DistanceContext::new(4);
+            let ctx = maxbin_core::distance::DistanceContext::new(4);
             let cpp = maxbin_rs_equivalence::original_ffi::OriginalEucDist::new(4);
 
-            let rust_d = maxbin_rs::distance::euc_dist_seq(&ctx, seq1.as_bytes(), seq2.as_bytes());
+            let rust_d = maxbin_core::distance::euc_dist_seq(&ctx, seq1.as_bytes(), seq2.as_bytes());
             let cpp_d = cpp.get_dist_seq(&seq1, &seq2);
 
             let diff = (rust_d - cpp_d).abs();
@@ -56,10 +56,10 @@ mod distance_proptest {
 
         #[test]
         fn spearman_dist_equivalence(seq1 in arb_dna_seq(), seq2 in arb_dna_seq()) {
-            let ctx = maxbin_rs::distance::DistanceContext::new(4);
+            let ctx = maxbin_core::distance::DistanceContext::new(4);
             let cpp = maxbin_rs_equivalence::original_ffi::OriginalSpearmanDist::new(4);
 
-            let rust_d = maxbin_rs::distance::spearman_dist_seq(&ctx, seq1.as_bytes(), seq2.as_bytes());
+            let rust_d = maxbin_core::distance::spearman_dist_seq(&ctx, seq1.as_bytes(), seq2.as_bytes());
             let cpp_d = cpp.get_dist_seq(&seq1, &seq2);
 
             let diff = (rust_d - cpp_d).abs();
@@ -104,8 +104,8 @@ mod distance_profiles_proptest {
     /// Generate a profile from a random DNA sequence.
     fn arb_profile() -> impl Strategy<Value = Vec<f64>> {
         arb_dna_seq().prop_map(|seq| {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let prof = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let prof = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
             prof.get_profile().to_vec()
         })
     }
@@ -118,13 +118,13 @@ mod distance_profiles_proptest {
             seq1 in arb_dna_seq(),
             seq2 in arb_dna_seq()
         ) {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let prof1 = maxbin_rs::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
-            let prof2 = maxbin_rs::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let prof1 = maxbin_core::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
+            let prof2 = maxbin_core::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
             let p1 = prof1.get_profile().to_vec();
             let p2 = prof2.get_profile().to_vec();
 
-            let rust_d = maxbin_rs::distance::euc_dist_profiles(&p1, &p2);
+            let rust_d = maxbin_core::distance::euc_dist_profiles(&p1, &p2);
             let cpp = maxbin_rs_equivalence::original_ffi::OriginalEucDist::new(4);
             let cpp_d = cpp.get_dist_profile(&p1, &p2);
 
@@ -140,14 +140,14 @@ mod distance_profiles_proptest {
             seq1 in arb_dna_seq(),
             seq2 in arb_dna_seq()
         ) {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let prof1 = maxbin_rs::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
-            let prof2 = maxbin_rs::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let prof1 = maxbin_core::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
+            let prof2 = maxbin_core::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
             let p1 = prof1.get_profile().to_vec();
             let p2 = prof2.get_profile().to_vec();
 
-            let ctx = maxbin_rs::distance::DistanceContext::new(4);
-            let rust_d = maxbin_rs::distance::spearman_dist_profiles(&ctx, &p1, &p2);
+            let ctx = maxbin_core::distance::DistanceContext::new(4);
+            let rust_d = maxbin_core::distance::spearman_dist_profiles(&ctx, &p1, &p2);
             let cpp = maxbin_rs_equivalence::original_ffi::OriginalSpearmanDist::new(4);
             let cpp_d = cpp.get_dist_profile(&p1, &p2);
 
@@ -160,31 +160,31 @@ mod distance_profiles_proptest {
 
         #[test]
         fn euc_dist_profiles_symmetry(p1 in arb_profile(), p2 in arb_profile()) {
-            let d12 = maxbin_rs::distance::euc_dist_profiles(&p1, &p2);
-            let d21 = maxbin_rs::distance::euc_dist_profiles(&p2, &p1);
+            let d12 = maxbin_core::distance::euc_dist_profiles(&p1, &p2);
+            let d21 = maxbin_core::distance::euc_dist_profiles(&p2, &p1);
             let diff = (d12 - d21).abs();
             prop_assert!(diff < 1e-14, "euc_dist not symmetric: d12={d12} d21={d21}");
         }
 
         #[test]
         fn spearman_dist_profiles_symmetry(p1 in arb_profile(), p2 in arb_profile()) {
-            let ctx = maxbin_rs::distance::DistanceContext::new(4);
-            let d12 = maxbin_rs::distance::spearman_dist_profiles(&ctx, &p1, &p2);
-            let d21 = maxbin_rs::distance::spearman_dist_profiles(&ctx, &p2, &p1);
+            let ctx = maxbin_core::distance::DistanceContext::new(4);
+            let d12 = maxbin_core::distance::spearman_dist_profiles(&ctx, &p1, &p2);
+            let d21 = maxbin_core::distance::spearman_dist_profiles(&ctx, &p2, &p1);
             let diff = (d12 - d21).abs();
             prop_assert!(diff < 1e-10, "spearman_dist not symmetric: d12={d12} d21={d21}");
         }
 
         #[test]
         fn euc_dist_profiles_self_distance(p in arb_profile()) {
-            let d = maxbin_rs::distance::euc_dist_profiles(&p, &p);
+            let d = maxbin_core::distance::euc_dist_profiles(&p, &p);
             prop_assert!(d.abs() < 1e-14, "self euc_dist should be 0, got {d}");
         }
 
         #[test]
         fn spearman_dist_profiles_self_distance(p in arb_profile()) {
-            let ctx = maxbin_rs::distance::DistanceContext::new(4);
-            let d = maxbin_rs::distance::spearman_dist_profiles(&ctx, &p, &p);
+            let ctx = maxbin_core::distance::DistanceContext::new(4);
+            let d = maxbin_core::distance::spearman_dist_profiles(&ctx, &p, &p);
             prop_assert!(d.abs() < 1e-10, "self spearman_dist should be 0, got {d}");
         }
     }

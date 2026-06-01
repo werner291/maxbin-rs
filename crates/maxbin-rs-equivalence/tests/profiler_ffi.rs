@@ -1,9 +1,9 @@
 //! FFI equivalence test for the tetranucleotide profiler.
 //!
-//! Compares `maxbin_rs::profiler::Profiler` against the original MaxBin2 C++
+//! Compares `maxbin_core::profiler::Profiler` against the original MaxBin2 C++
 //! Profiler. Previously an in-source test in `profiler.rs`.
-use maxbin_rs::kmer_map::KmerMap;
-use maxbin_rs::profiler::Profiler;
+use maxbin_core::kmer_map::KmerMap;
+use maxbin_core::profiler::Profiler;
 use maxbin_rs_equivalence::original_ffi::{OriginalKmerMap, OriginalProfiler};
 
 #[test]

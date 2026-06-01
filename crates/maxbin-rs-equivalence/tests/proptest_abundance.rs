@@ -67,7 +67,7 @@ proptest! {
         }
 
         // Rust
-        let rust_records = maxbin_rs::abundance::parse(Cursor::new(input.as_bytes())).unwrap();
+        let rust_records = maxbin_core::abundance::parse(Cursor::new(input.as_bytes())).unwrap();
 
         // C++
         let original = maxbin_rs_equivalence::original_ffi::OriginalAbundanceLoader::new(&tmp_path);

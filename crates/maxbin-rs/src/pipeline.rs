@@ -9,7 +9,7 @@
 /// 6. Merge noclass, filter small bins, sort by abundance
 /// 7. Write output files
 use crate::cli::{EmArgs, FilterArgs, PipelineArgs, SamToAbundArgs, SeedsArgs};
-use crate::fasta;
+use maxbin_core::fasta;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 

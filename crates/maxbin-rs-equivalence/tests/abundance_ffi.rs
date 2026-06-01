@@ -1,8 +1,8 @@
 //! FFI equivalence test for the abundance-file parser.
 //!
-//! Compares `maxbin_rs::abundance` against the original MaxBin2 C++
+//! Compares `maxbin_core::abundance` against the original MaxBin2 C++
 //! AbundanceLoader. Previously an in-source test in `abundance.rs`.
-use maxbin_rs::abundance::parse_file;
+use maxbin_core::abundance::parse_file;
 use maxbin_rs_equivalence::original_ffi::OriginalAbundanceLoader;
 
 #[test]

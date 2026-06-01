@@ -1,8 +1,8 @@
 //! FFI equivalence tests for the k-mer mapping table.
 //!
-//! Compares `maxbin_rs::kmer_map::KmerMap` against the original MaxBin2 C++
+//! Compares `maxbin_core::kmer_map::KmerMap` against the original MaxBin2 C++
 //! kmerMap. Previously in-source tests in `kmer_map.rs`.
-use maxbin_rs::kmer_map::KmerMap;
+use maxbin_core::kmer_map::KmerMap;
 use maxbin_rs_equivalence::original_ffi::OriginalKmerMap;
 
 #[test]

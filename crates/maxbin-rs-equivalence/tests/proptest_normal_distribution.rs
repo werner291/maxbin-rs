@@ -13,7 +13,7 @@ proptest! {
         std_dev in 0.01f64..50.0,
         input in -200.0f64..200.0
     ) {
-        let rust_nd = maxbin_rs::normal_distribution::NormalDistribution::new(mean, std_dev);
+        let rust_nd = maxbin_core::normal_distribution::NormalDistribution::new(mean, std_dev);
         let cpp_nd = maxbin_rs_equivalence::original_ffi::OriginalNormalDistribution::new(mean, std_dev);
 
         let rust_p = rust_nd.prob(input);

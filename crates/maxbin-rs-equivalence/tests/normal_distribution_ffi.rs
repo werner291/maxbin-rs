@@ -1,9 +1,9 @@
 //! FFI equivalence test for the normal distribution PDF.
 //!
-//! Compares `maxbin_rs::normal_distribution::NormalDistribution` against the
+//! Compares `maxbin_core::normal_distribution::NormalDistribution` against the
 //! original MaxBin2 C++ NormalDistribution. Previously an in-source test in
 //! `normal_distribution.rs`.
-use maxbin_rs::normal_distribution::NormalDistribution;
+use maxbin_core::normal_distribution::NormalDistribution;
 use maxbin_rs_equivalence::original_ffi::OriginalNormalDistribution;
 
 #[test]

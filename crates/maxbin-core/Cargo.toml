@@ -1,0 +1,9 @@
+[package]
+name = "maxbin-core"
+version = "0.4.0"
+edition = "2024"
+publish = false
+description = "Pure, host-agnostic core of maxbin-rs: tetranucleotide distance, k-mer profiling, abundance/FASTA parsing. No OS or external-tool dependencies; compiles to wasm."
+
+[dependencies]
+flate2 = "1.1.9"

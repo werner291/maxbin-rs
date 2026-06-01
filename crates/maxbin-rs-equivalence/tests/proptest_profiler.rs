@@ -47,11 +47,11 @@ mod profiler_proptest {
 
         #[test]
         fn profiler_equivalence(seq in arb_dna_seq()) {
-            let rust_kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
+            let rust_kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
             let cpp_kmap = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(4, true);
             let entry_num = rust_kmap.get_entry_num();
 
-            let rust_prof = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &rust_kmap);
+            let rust_prof = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &rust_kmap);
             let cpp_prof = maxbin_rs_equivalence::original_ffi::OriginalProfiler::new(4, &seq, &cpp_kmap);
 
             let rust_profile = rust_prof.get_profile();
@@ -114,12 +114,12 @@ mod profiler_weighted_avg_proptest {
         /// must reproduce the original profile exactly.
         #[test]
         fn add_calc_single_profile_identity(seq in arb_dna_seq()) {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let source = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let source = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
             let source_profile = source.get_profile().to_vec();
 
             // Create accumulator: fresh Profiler from a dummy seq then reset
-            let mut accum = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
+            let mut accum = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
             accum.reset();
 
             // Add the source with weight=1
@@ -142,9 +142,9 @@ mod profiler_weighted_avg_proptest {
         /// equal their arithmetic mean elementwise.
         #[test]
         fn add_calc_two_profiles_equal_weight(seq1 in arb_dna_seq(), seq2 in arb_dna_seq()) {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let prof1 = maxbin_rs::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
-            let prof2 = maxbin_rs::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let prof1 = maxbin_core::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
+            let prof2 = maxbin_core::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
 
             let p1 = prof1.get_profile().to_vec();
             let p2 = prof2.get_profile().to_vec();
@@ -153,7 +153,7 @@ mod profiler_weighted_avg_proptest {
             let expected: Vec<f64> = p1.iter().zip(p2.iter()).map(|(a, b)| (a + b) / 2.0).collect();
 
             // Accumulate with equal weights
-            let mut accum = maxbin_rs::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
+            let mut accum = maxbin_core::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
             accum.reset();
             accum.add_profile(&prof1, 1.0);
             accum.add_profile(&prof2, 1.0);
@@ -180,9 +180,9 @@ mod profiler_weighted_avg_proptest {
             w1 in 0.1f64..100.0,
             w2 in 0.1f64..100.0
         ) {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let prof1 = maxbin_rs::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
-            let prof2 = maxbin_rs::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let prof1 = maxbin_core::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
+            let prof2 = maxbin_core::profiler::Profiler::new(4, seq2.as_bytes(), &kmap);
 
             let p1 = prof1.get_profile().to_vec();
             let p2 = prof2.get_profile().to_vec();
@@ -192,7 +192,7 @@ mod profiler_weighted_avg_proptest {
                 .map(|(a, b)| (w1 * a + w2 * b) / total)
                 .collect();
 
-            let mut accum = maxbin_rs::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
+            let mut accum = maxbin_core::profiler::Profiler::new(4, seq1.as_bytes(), &kmap);
             accum.reset();
             accum.add_profile(&prof1, w1);
             accum.add_profile(&prof2, w2);
@@ -213,9 +213,9 @@ mod profiler_weighted_avg_proptest {
         /// calc_profile(0.0) must zero the profile (not produce NaN/Inf).
         #[test]
         fn calc_profile_zero_weight_produces_zeros(seq in arb_dna_seq()) {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let prof = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
-            let mut accum = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let prof = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
+            let mut accum = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
             accum.reset();
             accum.add_profile(&prof, 1.0);
             accum.calc_profile(0.0); // should zero everything
@@ -228,9 +228,9 @@ mod profiler_weighted_avg_proptest {
         /// reset() must zero all entries regardless of prior state.
         #[test]
         fn reset_zeroes_all_entries(seq in arb_dna_seq()) {
-            let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let source = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
-            let mut accum = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
+            let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
+            let source = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
+            let mut accum = maxbin_core::profiler::Profiler::new(4, seq.as_bytes(), &kmap);
 
             // Accumulate some state
             accum.add_profile(&source, 5.0);

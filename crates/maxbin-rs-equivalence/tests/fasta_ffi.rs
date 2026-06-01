@@ -1,10 +1,10 @@
 //! FFI equivalence test for the FASTA parser.
 //!
-//! Compares `maxbin_rs::fasta` against the original MaxBin2 C++ fastaReader.
+//! Compares `maxbin_core::fasta` against the original MaxBin2 C++ fastaReader.
 //! Requires nf-core test data via the `MAXBIN2_TEST_CONTIGS` env var (set by
 //! the Nix devshell); skips otherwise. Previously an in-source test in
 //! `fasta.rs`.
-use maxbin_rs::fasta::parse_file;
+use maxbin_core::fasta::parse_file;
 use maxbin_rs_equivalence::original_ffi::OriginalFastaReader;
 
 /// Decompress a .gz file to a temp path for the C++ parser (which can't read gzip).

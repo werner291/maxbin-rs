@@ -75,7 +75,7 @@ fn bench_normal_distribution() -> (f64, f64) {
     });
 
     let rust_count = count_ops(BENCH_DURATION, || {
-        let nd = maxbin_rs::normal_distribution::NormalDistribution::new(mean, std_dev);
+        let nd = maxbin_core::normal_distribution::NormalDistribution::new(mean, std_dev);
         for &x in &inputs {
             std::hint::black_box(nd.prob(x));
         }
@@ -100,7 +100,7 @@ fn bench_quicksort() -> (f64, f64) {
     let rust_count = count_ops(BENCH_DURATION, || {
         let mut arr = base.clone();
         let mut idx: Vec<i32> = (0..arr.len() as i32).collect();
-        maxbin_rs::quicksort::sort_descending(&mut arr, Some(&mut idx));
+        maxbin_core::quicksort::sort_descending(&mut arr, Some(&mut idx));
         std::hint::black_box(&arr);
     });
 
@@ -133,7 +133,7 @@ fn bench_kmermap_lookup() -> (f64, f64) {
     });
 
     let rust_count = count_ops(BENCH_DURATION, || {
-        let km = maxbin_rs::kmer_map::KmerMap::new(4, true);
+        let km = maxbin_core::kmer_map::KmerMap::new(4, true);
         for kmer in &kmers {
             std::hint::black_box(km.get_mapping(kmer.as_bytes()));
         }
@@ -155,9 +155,9 @@ fn bench_profiler(seqs: &[Vec<u8>]) -> (f64, f64) {
     });
 
     let rust_count = count_ops(BENCH_DURATION, || {
-        let km = maxbin_rs::kmer_map::KmerMap::new(4, true);
+        let km = maxbin_core::kmer_map::KmerMap::new(4, true);
         for seq in seqs {
-            let prof = maxbin_rs::profiler::Profiler::new(4, seq, &km);
+            let prof = maxbin_core::profiler::Profiler::new(4, seq, &km);
             std::hint::black_box(prof.get_profile());
         }
     });
@@ -177,7 +177,7 @@ fn bench_euc_dist(profiles: &[(Vec<f64>, Vec<f64>)]) -> (f64, f64) {
 
     let rust_count = count_ops(BENCH_DURATION, || {
         for (p1, p2) in profiles {
-            std::hint::black_box(maxbin_rs::distance::euc_dist_profiles(p1, p2));
+            std::hint::black_box(maxbin_core::distance::euc_dist_profiles(p1, p2));
         }
     });
 
@@ -195,9 +195,9 @@ fn bench_spearman_dist(profiles: &[(Vec<f64>, Vec<f64>)]) -> (f64, f64) {
     });
 
     let rust_count = count_ops(BENCH_DURATION, || {
-        let ctx = maxbin_rs::distance::DistanceContext::new(4);
+        let ctx = maxbin_core::distance::DistanceContext::new(4);
         for (p1, p2) in profiles {
-            std::hint::black_box(maxbin_rs::distance::spearman_dist_profiles(&ctx, p1, p2));
+            std::hint::black_box(maxbin_core::distance::spearman_dist_profiles(&ctx, p1, p2));
         }
     });
 
@@ -213,7 +213,7 @@ fn bench_fasta_parse(path: &std::path::Path, raw_bytes: &[u8]) -> (f64, f64) {
     });
 
     let rust_count = count_ops(BENCH_DURATION, || {
-        let records = maxbin_rs::fasta::parse(Cursor::new(raw_bytes));
+        let records = maxbin_core::fasta::parse(Cursor::new(raw_bytes));
         std::hint::black_box(records.len());
     });
 
@@ -229,7 +229,7 @@ fn bench_abundance_parse(path: &std::path::Path, raw_bytes: &[u8]) -> (f64, f64)
     });
 
     let rust_count = count_ops(BENCH_DURATION, || {
-        let records = maxbin_rs::abundance::parse(Cursor::new(raw_bytes)).unwrap();
+        let records = maxbin_core::abundance::parse(Cursor::new(raw_bytes)).unwrap();
         std::hint::black_box(records.len());
     });
 
@@ -288,7 +288,7 @@ fn bench_components() {
     print_row("FASTA parse (file)", c, r);
 
     // Build profiles from real contigs for profiler/distance benchmarks
-    let records = maxbin_rs::fasta::parse(Cursor::new(&raw_bytes[..]));
+    let records = maxbin_core::fasta::parse(Cursor::new(&raw_bytes[..]));
     let seqs: Vec<Vec<u8>> = records.iter().map(|r| r.seq.clone()).collect();
     // Take first 50 contigs for profiler benchmark (keeps iteration time reasonable)
     let bench_seqs: Vec<Vec<u8>> = seqs.iter().take(50).cloned().collect();
@@ -315,11 +315,11 @@ fn bench_components() {
     print_row("Abundance parse (file)", c, r);
 
     // Build profile pairs for distance benchmarks
-    let kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
+    let kmap = maxbin_core::kmer_map::KmerMap::new(4, true);
     let profiles: Vec<Vec<f64>> = bench_seqs
         .iter()
         .map(|seq| {
-            let prof = maxbin_rs::profiler::Profiler::new(4, seq, &kmap);
+            let prof = maxbin_core::profiler::Profiler::new(4, seq, &kmap);
             prof.get_profile().to_vec()
         })
         .collect();

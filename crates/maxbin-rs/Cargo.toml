@@ -4,6 +4,7 @@ version = "0.4.0"
 edition = "2024"
 
 [dependencies]
+maxbin-core = { path = "../maxbin-core" }
 clap = { version = "4.6.1", features = ["derive"] }
 flate2 = "1.1.9"
 frag_gene_scan_rs = "1.1.0"

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/maxbin-rs", "crates/maxbin-rs-equivalence"]
+members = ["crates/maxbin-core", "crates/maxbin-rs", "crates/maxbin-rs-equivalence"]
 # The wasm frontend is built standalone by trunk, not by the native workspace
 # checks (leptos/web-sys do not compile for the host target). Promote it to a
 # member once it depends on the EM core compiled to wasm.

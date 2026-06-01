@@ -427,12 +427,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
+name = "maxbin-core"
+version = "0.4.0"
+dependencies = [
+ "flate2",
+]
+
+[[package]]
 name = "maxbin-rs"
 version = "0.4.0"
 dependencies = [
  "clap 4.6.1",
  "flate2",
  "frag_gene_scan_rs",
+ "maxbin-core",
  "rayon",
  "seq_io",
  "serde",
@@ -447,6 +455,7 @@ dependencies = [
  "cc",
  "clap 4.6.1",
  "flate2",
+ "maxbin-core",
  "maxbin-rs",
  "proptest",
 ]

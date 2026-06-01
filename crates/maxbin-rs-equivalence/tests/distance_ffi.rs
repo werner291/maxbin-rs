@@ -1,14 +1,14 @@
 //! Component-level FFI equivalence tests for distance metrics.
 //!
-//! These compare the Rust distance functions in `maxbin_rs::distance` against
+//! These compare the Rust distance functions in `maxbin_core::distance` against
 //! the original MaxBin2 C++ EucDist / SpearmanDist via FFI. They previously
 //! lived as in-source `#[cfg(test)]` tests inside `distance.rs`; they moved
 //! here when the C++ FFI was extracted from the core crate.
-use maxbin_rs::distance::{
+use maxbin_core::distance::{
     DistanceContext, euc_dist_profiles, euc_dist_seq, spearman_dist_profiles, spearman_dist_seq,
 };
-use maxbin_rs::kmer_map::KmerMap;
-use maxbin_rs::profiler::Profiler;
+use maxbin_core::kmer_map::KmerMap;
+use maxbin_core::profiler::Profiler;
 use maxbin_rs_equivalence::original_ffi::{OriginalEucDist, OriginalSpearmanDist};
 
 #[test]

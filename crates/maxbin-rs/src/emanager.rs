@@ -10,12 +10,12 @@ use std::path::Path;
 
 use rayon::prelude::*;
 
-use crate::abundance;
-use crate::distance;
-use crate::fasta;
-use crate::kmer_map::KmerMap;
-use crate::normal_distribution::NormalDistribution;
-use crate::profiler::Profiler;
+use maxbin_core::abundance;
+use maxbin_core::distance;
+use maxbin_core::fasta;
+use maxbin_core::kmer_map::KmerMap;
+use maxbin_core::normal_distribution::NormalDistribution;
+use maxbin_core::profiler::Profiler;
 
 /// Configuration constants matching the original EManager::init().
 /// Matches EManager.cpp:111-165 (init()): hardcoded defaults.
@@ -252,8 +252,8 @@ fn e_step_for_contig(
     i: usize,
     state: &EmState,
     seed_num: usize,
-    intra: &crate::normal_distribution::NormalDistribution,
-    inter: &crate::normal_distribution::NormalDistribution,
+    intra: &maxbin_core::normal_distribution::NormalDistribution,
+    inter: &maxbin_core::normal_distribution::NormalDistribution,
     params: &EmParams,
 ) -> Option<(Vec<f64>, i32)> {
     if state.records[i].len() < params.min_seq_length || state.is_profile_n[i] {
@@ -264,7 +264,7 @@ fn e_step_for_contig(
     let mut dist_prob = vec![0.0f64; seed_num];
     let mut sum = 0.0f64;
     for (dp, seed_prof) in dist_prob.iter_mut().zip(state.seed_profiles.iter()) {
-        let d = crate::distance::euc_dist_profiles(
+        let d = maxbin_core::distance::euc_dist_profiles(
             state.seq_profiles[i].get_profile(),
             seed_prof.get_profile(),
         );

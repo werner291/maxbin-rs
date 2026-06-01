@@ -12,7 +12,7 @@ proptest! {
         // Rust
         let mut rust_arr = input.clone();
         let mut rust_idx: Vec<i32> = (0..input.len() as i32).collect();
-        maxbin_rs::quicksort::sort_descending(&mut rust_arr, Some(&mut rust_idx));
+        maxbin_core::quicksort::sort_descending(&mut rust_arr, Some(&mut rust_idx));
 
         // C++
         let mut orig_arr = input.clone();
@@ -27,7 +27,7 @@ proptest! {
     #[test]
     fn quicksort_no_indices(input in prop::collection::vec(-1e6f64..1e6, 0..200)) {
         let mut rust_arr = input.clone();
-        maxbin_rs::quicksort::sort_descending(&mut rust_arr, None);
+        maxbin_core::quicksort::sort_descending(&mut rust_arr, None);
 
         let mut orig_arr = input.clone();
         maxbin_rs_equivalence::original_ffi::original_quicksort(&mut orig_arr, None);
@@ -45,7 +45,7 @@ proptest! {
 
         let mut rust_arr = input.clone();
         let mut rust_idx: Vec<i32> = (0..input.len() as i32).collect();
-        maxbin_rs::quicksort::sort_descending(&mut rust_arr, Some(&mut rust_idx));
+        maxbin_core::quicksort::sort_descending(&mut rust_arr, Some(&mut rust_idx));
 
         let mut orig_arr = input.clone();
         let mut orig_idx: Vec<i32> = (0..input.len() as i32).collect();
