@@ -57,6 +57,8 @@
             "rust-analyzer"
             "clippy"
           ];
+          # Browser visualization frontend (maxbin-rs-vis) targets wasm.
+          targets = [ "wasm32-unknown-unknown" ];
         };
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rust;
@@ -473,6 +475,12 @@
             pkgs.cachix
             pkgs.nixfmt-rfc-style
             maxbin2
+            # Browser frontend (maxbin-rs-vis): pure-Rust wasm via trunk.
+            # binaryen provides wasm-opt; wasm-bindgen-cli must match the
+            # wasm-bindgen crate version pinned in that crate's Cargo.toml.
+            pkgs.trunk
+            pkgs.wasm-bindgen-cli
+            pkgs.binaryen
           ];
           # Environment variables available inside the devshell:
           MAXBIN2_TEST_CONTIGS = "${datasets.bfragilis.contigs}";
