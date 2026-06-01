@@ -41,7 +41,7 @@ mod distance_proptest {
         #[test]
         fn euc_dist_equivalence(seq1 in arb_dna_seq(), seq2 in arb_dna_seq()) {
             let ctx = maxbin_rs::distance::DistanceContext::new(4);
-            let cpp = maxbin_rs::original_ffi::OriginalEucDist::new(4);
+            let cpp = maxbin_rs_equivalence::original_ffi::OriginalEucDist::new(4);
 
             let rust_d = maxbin_rs::distance::euc_dist_seq(&ctx, seq1.as_bytes(), seq2.as_bytes());
             let cpp_d = cpp.get_dist_seq(&seq1, &seq2);
@@ -57,7 +57,7 @@ mod distance_proptest {
         #[test]
         fn spearman_dist_equivalence(seq1 in arb_dna_seq(), seq2 in arb_dna_seq()) {
             let ctx = maxbin_rs::distance::DistanceContext::new(4);
-            let cpp = maxbin_rs::original_ffi::OriginalSpearmanDist::new(4);
+            let cpp = maxbin_rs_equivalence::original_ffi::OriginalSpearmanDist::new(4);
 
             let rust_d = maxbin_rs::distance::spearman_dist_seq(&ctx, seq1.as_bytes(), seq2.as_bytes());
             let cpp_d = cpp.get_dist_seq(&seq1, &seq2);
@@ -125,7 +125,7 @@ mod distance_profiles_proptest {
             let p2 = prof2.get_profile().to_vec();
 
             let rust_d = maxbin_rs::distance::euc_dist_profiles(&p1, &p2);
-            let cpp = maxbin_rs::original_ffi::OriginalEucDist::new(4);
+            let cpp = maxbin_rs_equivalence::original_ffi::OriginalEucDist::new(4);
             let cpp_d = cpp.get_dist_profile(&p1, &p2);
 
             let diff = (rust_d - cpp_d).abs();
@@ -148,7 +148,7 @@ mod distance_profiles_proptest {
 
             let ctx = maxbin_rs::distance::DistanceContext::new(4);
             let rust_d = maxbin_rs::distance::spearman_dist_profiles(&ctx, &p1, &p2);
-            let cpp = maxbin_rs::original_ffi::OriginalSpearmanDist::new(4);
+            let cpp = maxbin_rs_equivalence::original_ffi::OriginalSpearmanDist::new(4);
             let cpp_d = cpp.get_dist_profile(&p1, &p2);
 
             let diff = (rust_d - cpp_d).abs();

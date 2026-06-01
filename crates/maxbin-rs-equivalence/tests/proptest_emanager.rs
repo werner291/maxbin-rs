@@ -15,8 +15,10 @@ use proptest::prelude::*;
 
 /// Compute prob_dist via C++ FFI NormalDistribution for cross-checking.
 fn prob_dist_via_cpp_ffi(distance: f64) -> f64 {
-    let intra = maxbin_rs::original_ffi::OriginalNormalDistribution::new(0.0, 0.01037897 / 2.0);
-    let inter = maxbin_rs::original_ffi::OriginalNormalDistribution::new(0.0676654, 0.03419337);
+    let intra =
+        maxbin_rs_equivalence::original_ffi::OriginalNormalDistribution::new(0.0, 0.01037897 / 2.0);
+    let inter =
+        maxbin_rs_equivalence::original_ffi::OriginalNormalDistribution::new(0.0676654, 0.03419337);
     let d_intra = intra.prob(distance);
     let d_inter = inter.prob(distance);
     d_intra / (d_inter + d_intra)

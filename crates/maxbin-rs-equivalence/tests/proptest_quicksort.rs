@@ -17,7 +17,7 @@ proptest! {
         // C++
         let mut orig_arr = input.clone();
         let mut orig_idx: Vec<i32> = (0..input.len() as i32).collect();
-        maxbin_rs::original_ffi::original_quicksort(&mut orig_arr, Some(&mut orig_idx));
+        maxbin_rs_equivalence::original_ffi::original_quicksort(&mut orig_arr, Some(&mut orig_idx));
 
         prop_assert_eq!(&rust_arr, &orig_arr, "array mismatch");
         prop_assert_eq!(&rust_idx, &orig_idx, "index mismatch");
@@ -30,7 +30,7 @@ proptest! {
         maxbin_rs::quicksort::sort_descending(&mut rust_arr, None);
 
         let mut orig_arr = input.clone();
-        maxbin_rs::original_ffi::original_quicksort(&mut orig_arr, None);
+        maxbin_rs_equivalence::original_ffi::original_quicksort(&mut orig_arr, None);
 
         prop_assert_eq!(&rust_arr, &orig_arr, "array mismatch (no indices)");
     }
@@ -49,7 +49,7 @@ proptest! {
 
         let mut orig_arr = input.clone();
         let mut orig_idx: Vec<i32> = (0..input.len() as i32).collect();
-        maxbin_rs::original_ffi::original_quicksort(&mut orig_arr, Some(&mut orig_idx));
+        maxbin_rs_equivalence::original_ffi::original_quicksort(&mut orig_arr, Some(&mut orig_idx));
 
         prop_assert_eq!(&rust_arr, &orig_arr, "array mismatch with duplicates");
         prop_assert_eq!(&rust_idx, &orig_idx, "index mismatch with duplicates");

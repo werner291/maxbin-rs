@@ -14,7 +14,7 @@ mod kmermap_proptest {
         #[test]
         fn kmermap_mapping_equivalence(kmerlen in 1..6i32, symmetric in proptest::bool::ANY) {
             let rust_km = maxbin_rs::kmer_map::KmerMap::new(kmerlen as usize, symmetric);
-            let cpp_km = maxbin_rs::original_ffi::OriginalKmerMap::new(kmerlen, symmetric);
+            let cpp_km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(kmerlen, symmetric);
 
             let rust_entry = rust_km.get_entry_num() as i32;
             let cpp_entry = cpp_km.entry_num();
@@ -64,7 +64,7 @@ mod kmermap_per_kmer_proptest {
         fn kmermap_get_mapping(args in arb_kmerlen_and_kmer()) {
             let (kmerlen, symmetric, kmer) = args;
             let rust_km = maxbin_rs::kmer_map::KmerMap::new(kmerlen, symmetric);
-            let cpp_km = maxbin_rs::original_ffi::OriginalKmerMap::new(kmerlen as i32, symmetric);
+            let cpp_km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(kmerlen as i32, symmetric);
 
             let rust_idx = rust_km.get_mapping(kmer.as_bytes());
             let cpp_idx = cpp_km.get_mapping(&kmer);
@@ -81,7 +81,7 @@ mod kmermap_per_kmer_proptest {
         fn kmermap_get_reverse_mapping_str(args in arb_kmerlen_and_kmer()) {
             let (kmerlen, symmetric, kmer) = args;
             let rust_km = maxbin_rs::kmer_map::KmerMap::new(kmerlen, symmetric);
-            let cpp_km = maxbin_rs::original_ffi::OriginalKmerMap::new(kmerlen as i32, symmetric);
+            let cpp_km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(kmerlen as i32, symmetric);
 
             let rust_idx = rust_km.get_reverse_mapping_str(kmer.as_bytes());
             let cpp_idx = cpp_km.get_reverse_mapping_str(&kmer);
@@ -97,7 +97,7 @@ mod kmermap_per_kmer_proptest {
         fn kmermap_get_reverse_mapping_idx(args in arb_kmerlen_and_index()) {
             let (kmerlen, symmetric, index) = args;
             let rust_km = maxbin_rs::kmer_map::KmerMap::new(kmerlen, symmetric);
-            let cpp_km = maxbin_rs::original_ffi::OriginalKmerMap::new(kmerlen as i32, symmetric);
+            let cpp_km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(kmerlen as i32, symmetric);
 
             let rust_result = rust_km.get_reverse_mapping_idx(index);
             let cpp_result = cpp_km.get_reverse_mapping_idx(index as i32);
@@ -115,7 +115,7 @@ mod kmermap_per_kmer_proptest {
             kmer in "[A-Za-z0-9NRYWSKM]{4}"
         ) {
             let rust_km = maxbin_rs::kmer_map::KmerMap::new(4, symmetric);
-            let cpp_km = maxbin_rs::original_ffi::OriginalKmerMap::new(4, symmetric);
+            let cpp_km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(4, symmetric);
 
             let rust_idx = rust_km.get_mapping(kmer.as_bytes());
             let cpp_idx = cpp_km.get_mapping(&kmer);
@@ -133,7 +133,7 @@ mod kmermap_per_kmer_proptest {
             kmer in "[acgtACGT]{4}"
         ) {
             let rust_km = maxbin_rs::kmer_map::KmerMap::new(4, symmetric);
-            let cpp_km = maxbin_rs::original_ffi::OriginalKmerMap::new(4, symmetric);
+            let cpp_km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(4, symmetric);
 
             let rust_idx = rust_km.get_mapping(kmer.as_bytes());
             let cpp_idx = cpp_km.get_mapping(&kmer);

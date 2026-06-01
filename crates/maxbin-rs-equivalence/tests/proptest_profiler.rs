@@ -48,11 +48,11 @@ mod profiler_proptest {
         #[test]
         fn profiler_equivalence(seq in arb_dna_seq()) {
             let rust_kmap = maxbin_rs::kmer_map::KmerMap::new(4, true);
-            let cpp_kmap = maxbin_rs::original_ffi::OriginalKmerMap::new(4, true);
+            let cpp_kmap = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(4, true);
             let entry_num = rust_kmap.get_entry_num();
 
             let rust_prof = maxbin_rs::profiler::Profiler::new(4, seq.as_bytes(), &rust_kmap);
-            let cpp_prof = maxbin_rs::original_ffi::OriginalProfiler::new(4, &seq, &cpp_kmap);
+            let cpp_prof = maxbin_rs_equivalence::original_ffi::OriginalProfiler::new(4, &seq, &cpp_kmap);
 
             let rust_profile = rust_prof.get_profile();
             let cpp_profile = cpp_prof.get_profile(entry_num as i32);

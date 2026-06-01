@@ -70,7 +70,7 @@ proptest! {
         let rust_records = maxbin_rs::abundance::parse(Cursor::new(input.as_bytes())).unwrap();
 
         // C++
-        let original = maxbin_rs::original_ffi::OriginalAbundanceLoader::new(&tmp_path);
+        let original = maxbin_rs_equivalence::original_ffi::OriginalAbundanceLoader::new(&tmp_path);
 
         prop_assert!(original.is_parse_success(), "C++ parse failed");
         prop_assert_eq!(

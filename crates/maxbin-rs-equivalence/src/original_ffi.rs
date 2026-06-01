@@ -1,5 +1,5 @@
 /// FFI bindings to the original MaxBin2 C++ code.
-/// Used only for equivalence testing — not compiled into release builds.
+/// Used only for equivalence testing, inside the maxbin-rs-equivalence crate.
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 

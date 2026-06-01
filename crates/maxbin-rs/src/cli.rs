@@ -9,7 +9,6 @@
 ///   maxbin-rs filter       — filter contigs by minimum length
 ///   maxbin-rs seeds        — generate seed file from HMMER marker gene hits
 ///   maxbin-rs em           — run the Rust EM algorithm
-///   maxbin-rs cpp-em       — run the original C++ EM via FFI (equivalence testing)
 ///   maxbin-rs sam-to-abund — compute abundance from a SAM file
 ///   maxbin-rs pipeline     — run the full pipeline (default when no subcommand given)
 use std::path::PathBuf;
@@ -39,9 +38,6 @@ pub enum Command {
     Seeds(SeedsArgs),
     /// Run the Rust EM algorithm on pre-computed inputs.
     Em(EmArgs),
-    /// Run the original C++ EM via FFI (for equivalence testing).
-    #[command(name = "cpp-em", alias = "cpp_em")]
-    CppEm(CppEmArgs),
     /// Compute abundance from a SAM file.
     #[command(name = "sam-to-abund", alias = "sam_to_abund")]
     SamToAbund(SamToAbundArgs),
@@ -157,20 +153,6 @@ pub struct PipelineArgs {
     /// keeping, ./intermediates/ when --keep-intermediates).
     #[arg(long)]
     pub work_dir: Option<PathBuf>,
-}
-
-#[derive(Debug, Args)]
-pub struct CppEmArgs {
-    #[arg(long)]
-    pub contig: PathBuf,
-    #[arg(long)]
-    pub abund: PathBuf,
-    #[arg(long)]
-    pub seed: PathBuf,
-    #[arg(long)]
-    pub out: String,
-    #[arg(long, default_value_t = 1)]
-    pub thread: usize,
 }
 
 #[derive(Debug, Args)]

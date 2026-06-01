@@ -774,7 +774,7 @@ mod tests {
 
     // NOTE: get_prob_abund_matches_cpp was removed — it computed the "expected"
     // value using the same lgamma and formula as the function under test, making
-    // it tautological. Real coverage comes from proptest_emanager.rs (algebraic
-    // properties on the real function) and emanager_equivalence.rs (full pipeline
-    // byte-for-byte comparison against C++).
+    // it tautological. Real coverage lives in the maxbin-rs-equivalence crate:
+    // its proptest_emanager.rs (algebraic properties on the real function) and
+    // emanager_equivalence.rs (full pipeline byte-for-byte comparison against C++).
 }

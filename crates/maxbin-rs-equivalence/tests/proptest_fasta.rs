@@ -79,7 +79,7 @@ proptest! {
         let rust_records = maxbin_rs::fasta::parse(Cursor::new(input.as_bytes()));
 
         // C++ parser
-        let original = maxbin_rs::original_ffi::OriginalFastaReader::new(&tmp_path);
+        let original = maxbin_rs_equivalence::original_ffi::OriginalFastaReader::new(&tmp_path);
 
         prop_assert_eq!(
             rust_records.len(),
