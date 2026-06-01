@@ -10,15 +10,6 @@ leptos = { version = "0.7", features = ["csr"] }
 # Pinned to the wasm-bindgen-cli version the Nix devshell provides; trunk
 # rejects a crate/CLI mismatch.
 wasm-bindgen = "=0.2.114"
-web-sys = { version = "0.3", features = [
-  "HtmlCanvasElement",
-  "CanvasRenderingContext2d",
-  "HtmlInputElement",
-  "File",
-  "FileList",
-] }
 console_error_panic_hook = "0.1"
-# Fetch built-in datasets (static assets) and read custom file uploads
-# client-side. No server round-trip — uploads stay in the page.
+# Fetch the dataset intermediaries (static assets) client-side. No server.
 gloo-net = "0.6"
-gloo-file = { version = "0.3", features = ["futures"] }

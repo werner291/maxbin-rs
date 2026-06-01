@@ -8,3 +8,6 @@
 # Pipeline intermediates (--keep-intermediates)
 /intermediates/
 /output/
+
+# Claude Code local working dir (worktrees, settings)
+/.claude/

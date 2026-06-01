@@ -1,4 +1,4 @@
-//! maxbin-rs-vis — browser teaching/visualization frontend for the maxbin-rs EM core.
+//! maxbin-rs-vis - browser teaching/visualization frontend for the maxbin-rs EM core.
 //!
 //! Scaffold only. This crate is the single place that will know about WASM and
 //! the browser; the EM core stays plain, host-agnostic Rust and gets wired in

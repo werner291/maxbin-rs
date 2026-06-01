@@ -3,9 +3,84 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>maxbin-rs · EM inputs</title>
+    <title>maxbin-rs · what goes in</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono&display=swap" rel="stylesheet" />
     <link data-trunk rel="rust" />
     <link data-trunk rel="copy-dir" href="assets" />
+    <style>
+      :root {
+        --paper: #fbfaf7; --ink: #1c1a17; --dim: #6b6557; --rule: #d8d2c4;
+        --field: #2f7d5b; --accent: #46618c; --sheet: 794px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--field); color: var(--ink);
+        font-family: 'Source Serif 4', Georgia, serif; font-size: 18px; line-height: 1.7;
+        font-feature-settings: "onum" 1, "pnum" 1;
+      }
+      .field { min-height: 100vh; padding: 40px 24px 80px; }
+      .sheet {
+        max-width: var(--sheet); margin: 0 auto; background: var(--paper);
+        padding: 56px 60px 72px; box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 12px 40px rgba(0,0,0,.16);
+      }
+      .kicker {
+        font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: .18em;
+        text-transform: uppercase; color: var(--dim); margin: 0;
+      }
+      h1 { font-size: 38px; font-weight: 600; line-height: 1.12; margin: .15em 0 .3em; letter-spacing: -.3px; }
+      h2 { font-size: 24px; font-weight: 600; margin: 1.4em 0 .1em; }
+      h3 { font-size: 15px; font-weight: 600; margin: 1.5em 0 .4em; text-transform: uppercase;
+           letter-spacing: .06em; color: var(--dim); }
+      .intro { font-size: 19px; color: #2b2822; }
+      .intro:first-of-type { margin-top: .6em; }
+      .lede { font-size: 18px; color: #2b2822; }
+      .blurb { color: #2b2822; }
+      p { margin: .6em 0; }
+      .intro, .lede, .blurb {
+        text-align: justify; text-justify: inter-word;
+        hyphens: auto; -webkit-hyphens: auto;
+      }
+      .chooser { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 28px 0 4px; }
+      select, button {
+        font-family: 'IBM Plex Mono', monospace; font-size: 14px; padding: 8px 12px;
+        border: 1px solid var(--rule); background: #fff; color: var(--ink); border-radius: 4px;
+      }
+      select { min-width: 22em; }
+      button { background: var(--field); color: #fff; border-color: var(--field); cursor: pointer; }
+      button:disabled { background: var(--rule); border-color: var(--rule); color: var(--dim); cursor: default; }
+      .status { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--dim); }
+      .meta { margin-top: 8px; border-top: 1px solid var(--rule); padding-top: 8px; }
+      table { border-collapse: collapse; width: 100%; margin: .3em 0; font-size: 15.5px; }
+      th { text-align: left; font-weight: 400; color: var(--dim); padding: 5px 14px 5px 0; vertical-align: top; }
+      thead th { color: var(--ink); font-weight: 600; border-bottom: 1px solid var(--rule); }
+      td { padding: 5px 0; }
+      .num { font-family: 'IBM Plex Mono', monospace; text-align: right; font-feature-settings: "tnum" 1; }
+      .note { font-size: 14.5px; color: var(--dim); }
+      .notes { margin-top: 1em; border-top: 1px dotted var(--rule); padding-top: .4em; }
+
+      /* Pipeline rail: a vertical chain of steps, last node green = runs here. */
+      .pipeline { margin: .8em 0 1.4em; }
+      .stage { position: relative; border-left: 2px solid var(--rule); padding: 0 0 20px 20px; }
+      .stage:last-child { border-left-color: transparent; padding-bottom: 0; }
+      .stage::before {
+        content: ''; position: absolute; left: -7px; top: 3px; width: 12px; height: 12px;
+        border-radius: 50%; background: #fff; border: 2px solid var(--dim); box-sizing: border-box;
+      }
+      .stage.upstream::before { border-color: var(--rule); background: var(--rule); }
+      .stage.browser::before { border-color: var(--field); background: var(--field); }
+      .stage-head { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; }
+      .stage-name { font-weight: 600; font-size: 16.5px; }
+      .stage-tool { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--dim); margin-top: 1px; }
+      .chip {
+        font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 2px 9px;
+        border-radius: 11px; white-space: nowrap; letter-spacing: .02em;
+      }
+      .chip.upstream { background: #efece6; color: var(--dim); }
+      .chip.have { background: #e3efe7; color: #1f6b47; }
+      .chip.missing { background: #f1e8df; color: #8a5a2b; }
+      .chip.live { background: var(--field); color: #fff; }
+    </style>
   </head>
   <body></body>
 </html>
