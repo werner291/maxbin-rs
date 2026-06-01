@@ -437,6 +437,8 @@ name = "maxbin-core"
 version = "0.4.0"
 dependencies = [
  "flate2",
+ "libm",
+ "rayon",
 ]
 
 [[package]]
@@ -446,7 +448,6 @@ dependencies = [
  "clap 4.6.1",
  "flate2",
  "frag_gene_scan_rs",
- "libm",
  "maxbin-core",
  "rayon",
  "seq_io",

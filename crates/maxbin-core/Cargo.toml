@@ -7,3 +7,9 @@ description = "Pure, host-agnostic core of maxbin-rs: tetranucleotide distance, 
 
 [dependencies]
 flate2 = "1.1.9"
+libm = "0.2"
+
+# The E-step parallelizes over contigs with rayon on native targets. wasm32 has
+# no thread pool, so the dependency is dropped there and the E-step runs serially.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1.10"
