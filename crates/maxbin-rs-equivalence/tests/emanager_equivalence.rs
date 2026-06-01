@@ -61,8 +61,11 @@ fn emanager_cpp_vs_rust() {
     // Run C++ EManager via FFI.
     let cpp_prefix = test_dir.join("cpp").to_str().unwrap().to_string();
     {
-        let em =
-            maxbin_rs::original_ffi::OriginalEManager::new(&fasta_path, &abund_path, &cpp_prefix);
+        let em = maxbin_rs_equivalence::original_ffi::OriginalEManager::new(
+            &fasta_path,
+            &abund_path,
+            &cpp_prefix,
+        );
         em.set_thread_num(1);
         assert_eq!(em.run(&seed_path), 0, "C++ EManager returned error");
     }
@@ -140,8 +143,11 @@ fn emanager_precision_divergence_cami_depth4() {
     // Run C++ EManager via FFI
     let cpp_prefix = test_dir.join("cpp").to_str().unwrap().to_string();
     {
-        let em =
-            maxbin_rs::original_ffi::OriginalEManager::new(&fasta_path, &abund_path, &cpp_prefix);
+        let em = maxbin_rs_equivalence::original_ffi::OriginalEManager::new(
+            &fasta_path,
+            &abund_path,
+            &cpp_prefix,
+        );
         em.set_thread_num(1);
         let rc = em.run(&seed_path);
         assert_eq!(rc, 0, "C++ EManager returned error");

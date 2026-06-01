@@ -1,0 +1,16 @@
+[package]
+name = "maxbin-rs-equivalence"
+version = "0.4.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+maxbin-rs = { path = "../maxbin-rs" }
+
+[build-dependencies]
+cc = "1.2.60"
+
+[dev-dependencies]
+flate2 = "1.1.9"
+proptest = "1.11.0"

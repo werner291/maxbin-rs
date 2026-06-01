@@ -8,7 +8,7 @@
 /// 5. Recursive binning: seed → EM → re-seed output bins → repeat (up to 5 levels)
 /// 6. Merge noclass, filter small bins, sort by abundance
 /// 7. Write output files
-use crate::cli::{CppEmArgs, EmArgs, FilterArgs, PipelineArgs, SamToAbundArgs, SeedsArgs};
+use crate::cli::{EmArgs, FilterArgs, PipelineArgs, SamToAbundArgs, SeedsArgs};
 use crate::fasta;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -345,26 +345,6 @@ pub fn run_em(args: &EmArgs) -> Result<(), String> {
 
     let bin_count = rename_bins_to_3digit(&args.out);
     eprintln!("Done: {bin_count} bins produced (EM: {em_secs:.1}s)");
-    Ok(())
-}
-
-/// Run the `cpp-em` subcommand: run the original C++ EM via FFI.
-/// The C++ EManager handles its own data loading, EM, classification,
-/// and file writing internally — we time the whole thing as one block.
-pub fn run_cpp_em(args: &CppEmArgs) -> Result<(), String> {
-    eprintln!("Running original C++ EM via FFI...");
-    eprintln!("  contigs: {}", args.contig.display());
-    eprintln!("  abund:   {}", args.abund.display());
-    eprintln!("  seed:    {}", args.seed.display());
-    eprintln!("  threads: {}", args.thread);
-
-    let t = std::time::Instant::now();
-    let em = crate::original_ffi::OriginalEManager::new(&args.contig, &args.abund, &args.out);
-    em.set_thread_num(args.thread as i32);
-    let result = em.run(&args.seed);
-    let secs = t.elapsed().as_secs_f64();
-
-    eprintln!("C++ EM completed in {secs:.1}s (returned: {result})");
     Ok(())
 }
 

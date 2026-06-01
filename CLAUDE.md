@@ -42,8 +42,12 @@ Uses standard double-dash flags (`--contig`, `--abund`, etc.). Single-dash compa
 - `maxbin-rs filter` — filter contigs by minimum length
 - `maxbin-rs seeds` — generate seed file from HMMER marker gene hits
 - `maxbin-rs em` — run the Rust EM algorithm
-- `maxbin-rs cpp-em` — run the original C++ EM via FFI (equivalence testing only)
 - `maxbin-rs sam-to-abund` — compute abundance from a SAM file
+
+The original C++ EM (used only for equivalence testing) now lives in a
+separate crate: run it via `maxbin-rs-cpp-em` from `crates/maxbin-rs-equivalence`
+(see below). It is no longer a `maxbin-rs` subcommand, so the core crate carries
+no C/C++.
 
 ### Key source files (in `crates/maxbin-rs/src/`)
 
@@ -53,9 +57,29 @@ Uses standard double-dash flags (`--contig`, `--abund`, etc.). Single-dash compa
 - `kmer_map.rs` — tetranucleotide frequency computation
 - `abundance.rs` — abundance file parsing
 - `fasta.rs` — FASTA reading/writing
-- `original_ffi.rs` — C++ FFI bridge for equivalence testing against the original EM
 - `external.rs` — shelling out to HMMER, Bowtie2, gene caller
 - `profiler.rs` — timing instrumentation
+
+The core crate has no `build.rs` and no C/C++ dependency, so it can eventually
+compile to wasm.
+
+### Equivalence crate (`crates/maxbin-rs-equivalence/`)
+
+Holds everything that links the original MaxBin2 C++ for FFI-based equivalence
+testing, kept out of the core crate:
+
+- `build.rs` + `vendor/`: extract the upstream MaxBin2 C++ from the tarball
+  (`MAXBIN2_SRC_TARBALL`), apply `vendor/maxbin2-cpp-ffi.patch`, and compile it
+  as a static lib via `cc`.
+- `src/original_ffi.rs`: Rust FFI bindings to that C++ (re-exported from the
+  crate's `lib.rs`).
+- `src/bin/maxbin-rs-cpp-em.rs`: the `maxbin-rs-cpp-em` binary that runs the
+  original C++ EM via FFI (formerly the `cpp-em` subcommand).
+- `tests/`: the FFI equivalence tests and the FFI-comparing proptests. They
+  exercise the core crate's public API and compare it against the C++. The
+  `divergent-em` fixture lives here too.
+
+The crate depends on `maxbin-rs` as a path dependency.
 
 ### Parallelism
 
@@ -74,7 +98,7 @@ Outputs: one FASTA per bin + summary statistics + `.log` file.
 
 ## Testing Strategy
 
-- **Equivalence tests** compare Rust output against original MaxBin2 on the same input, including reproducing known bugs. The C++ EM is available via FFI (`cpp-em` subcommand) for component-level comparison.
+- **Equivalence tests** compare Rust output against original MaxBin2 on the same input, including reproducing known bugs. The C++ EM is available via FFI in the `maxbin-rs-equivalence` crate (the `maxbin-rs-cpp-em` binary) for component-level comparison.
 - **Property tests** (proptest) cover parsing, distance computation, EM numerics, and sorting.
 - **Benchmarks** via `cargo nextest run --cargo-profile bench bench_components -- --ignored`.
 - When an equivalence test reveals a bug in the original, **document it** (in TODO.md and/or inline) but still reproduce the buggy behavior in the v0.1.x code path.

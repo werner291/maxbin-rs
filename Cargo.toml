@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/maxbin-rs"]
+members = ["crates/maxbin-rs", "crates/maxbin-rs-equivalence"]
 
 # Profiles are only honored at the workspace root, so the benchmark profile
 # that used to live in the crate manifest moves here.

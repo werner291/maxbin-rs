@@ -302,26 +302,6 @@ assert_exit_code "4.9 em-missing-out" 1 \
 echo ""
 
 # =========================================================================
-# 5. cpp-em subcommand
-# =========================================================================
-echo "--- 5. cpp-em subcommand ---"
-
-D="$WORK/cpp_em"
-
-# 5.1 basic
-mkdir -p "$D/basic"
-assert_exit_code "5.1 cpp-em-basic" 0 \
-  maxbin-rs cpp-em --contig "$FILTERED" --abund "$ABUND" --seed "$SEED" --out "$D/basic/test"
-assert_file_exists "$D/basic/test.summary" "5.1 summary"
-
-# 5.2 underscore subcommand variant
-mkdir -p "$D/underscore"
-assert_exit_code "5.2 cpp_em-underscore" 0 \
-  maxbin-rs cpp_em --contig "$FILTERED" --abund "$ABUND" --seed "$SEED" --out "$D/underscore/test"
-
-echo ""
-
-# =========================================================================
 # 6. sam-to-abund subcommand
 # =========================================================================
 echo "--- 6. sam-to-abund subcommand ---"

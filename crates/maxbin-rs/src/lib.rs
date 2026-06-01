@@ -10,7 +10,3 @@ pub mod paths;
 pub mod pipeline;
 pub mod profiler;
 pub mod quicksort;
-
-// Always compiled — the C++ FFI is linked by build.rs regardless, and
-// integration tests need access to these bindings.
-pub mod original_ffi;

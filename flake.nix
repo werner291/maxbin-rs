@@ -75,6 +75,11 @@
             path: type:
             (craneLib.filterCargoSources path type) || builtins.match ".*/(nix|vendor|tests)/.*" path != null;
         };
+        # Shared build arguments. MAXBIN2_SRC_TARBALL is consumed by the
+        # maxbin-rs-equivalence crate's build.rs (it extracts and links the
+        # original MaxBin2 C++ for FFI equivalence testing). The core
+        # maxbin-rs crate has no build.rs and ignores it; the workspace-wide
+        # clippy and nextest checks need it because they span both crates.
         commonArgs = {
           inherit src;
           pname = "maxbin-rs";
@@ -83,6 +88,13 @@
           nativeBuildInputs = [ pkgs.makeWrapper ];
         };
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+        # Build arguments for the core crate alone — no C++ toolchain or
+        # tarball needed. The published binaries (maxbin-rs, maxbin-rs-em)
+        # build only this crate so they carry zero C/C++.
+        coreArgs = builtins.removeAttrs commonArgs [ "MAXBIN2_SRC_TARBALL" ] // {
+          cargoExtraArgs = "-p maxbin-rs";
+        };
 
         # =====================================================================
         # Packages
@@ -137,7 +149,7 @@
         # Supports `em`, `filter`, and `seeds` subcommands only.
         # Pipeline mode errors out telling the user to use the full package.
         maxbin-rs-em = craneLib.buildPackage (
-          commonArgs
+          coreArgs
           // {
             inherit cargoArtifacts;
             pname = "maxbin-rs-em";
@@ -146,7 +158,7 @@
 
         # The Rust reimplementation — this is the main output of this project.
         maxbin-rs = craneLib.buildPackage (
-          commonArgs
+          coreArgs
           // {
             inherit cargoArtifacts;
             # Wrap the binary so HMMER, Bowtie2, and FragGeneScan are on $PATH
@@ -172,23 +184,27 @@
           }
         );
 
-        # Same as maxbin-rs but with C++ LTO enabled for the FFI library.
-        # Used for A/B benchmarking to test whether -flto closes the ~8x gap.
-        maxbin-rs-lto = craneLib.buildPackage (
+        # The equivalence crate's cpp-em binary with C++ LTO enabled for the
+        # FFI library. Used for A/B benchmarking to test whether -flto closes
+        # the performance gap. Produces $out/bin/maxbin-rs-cpp-em.
+        maxbin-rs-cpp-em-lto = craneLib.buildPackage (
           commonArgs
           // {
             inherit cargoArtifacts;
-            pname = "maxbin-rs-lto";
+            pname = "maxbin-rs-cpp-em-lto";
+            cargoExtraArgs = "-p maxbin-rs-equivalence --bin maxbin-rs-cpp-em";
             MAXBIN2_CPP_LTO = "1";
-            postInstall = ''
-              wrapProgram $out/bin/maxbin-rs \
-                --prefix PATH : "${
-                  pkgs.lib.makeBinPath [
-                    pkgs.hmmer
-                    pkgs.bowtie2
-                  ]
-                }:${fraggenescan}/libexec/FragGeneScan"
-            '';
+          }
+        );
+
+        # The equivalence crate's cpp-em binary (no LTO), the baseline for the
+        # A/B benchmark above. Produces $out/bin/maxbin-rs-cpp-em.
+        maxbin-rs-cpp-em = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            pname = "maxbin-rs-cpp-em";
+            cargoExtraArgs = "-p maxbin-rs-equivalence --bin maxbin-rs-cpp-em";
           }
         );
 
@@ -298,12 +314,14 @@
             maxbin2-trace
             maxbin2-f64-trace
             maxbin-rs
-            maxbin-rs-lto
+            maxbin-rs-cpp-em
+            maxbin-rs-cpp-em-lto
             fraggenescan
             fraggenescan-rs
             rust
             ;
           inherit (pkgs) cargo-nextest;
+          inherit maxbin2-src-tarball;
           inherit datasets intermediates;
         };
 

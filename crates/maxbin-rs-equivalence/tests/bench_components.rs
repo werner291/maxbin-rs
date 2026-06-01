@@ -67,7 +67,8 @@ fn bench_normal_distribution() -> (f64, f64) {
     let inputs: Vec<f64> = (0..1000).map(|i| i as f64 * 0.001).collect();
 
     let cpp_count = count_ops(BENCH_DURATION, || {
-        let nd = maxbin_rs::original_ffi::OriginalNormalDistribution::new(mean, std_dev);
+        let nd =
+            maxbin_rs_equivalence::original_ffi::OriginalNormalDistribution::new(mean, std_dev);
         for &x in &inputs {
             std::hint::black_box(nd.prob(x));
         }
@@ -92,7 +93,7 @@ fn bench_quicksort() -> (f64, f64) {
     let cpp_count = count_ops(BENCH_DURATION, || {
         let mut arr = base.clone();
         let mut idx: Vec<i32> = (0..arr.len() as i32).collect();
-        maxbin_rs::original_ffi::original_quicksort(&mut arr, Some(&mut idx));
+        maxbin_rs_equivalence::original_ffi::original_quicksort(&mut arr, Some(&mut idx));
         std::hint::black_box(&arr);
     });
 
@@ -125,7 +126,7 @@ fn bench_kmermap_lookup() -> (f64, f64) {
     };
 
     let cpp_count = count_ops(BENCH_DURATION, || {
-        let km = maxbin_rs::original_ffi::OriginalKmerMap::new(4, true);
+        let km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(4, true);
         for kmer in &kmers {
             std::hint::black_box(km.get_mapping(kmer));
         }
@@ -145,10 +146,10 @@ fn bench_kmermap_lookup() -> (f64, f64) {
 
 fn bench_profiler(seqs: &[Vec<u8>]) -> (f64, f64) {
     let cpp_count = count_ops(BENCH_DURATION, || {
-        let km = maxbin_rs::original_ffi::OriginalKmerMap::new(4, true);
+        let km = maxbin_rs_equivalence::original_ffi::OriginalKmerMap::new(4, true);
         for seq in seqs {
             let s = std::str::from_utf8(seq).unwrap();
-            let prof = maxbin_rs::original_ffi::OriginalProfiler::new(4, s, &km);
+            let prof = maxbin_rs_equivalence::original_ffi::OriginalProfiler::new(4, s, &km);
             std::hint::black_box(prof.get_profile(136));
         }
     });
@@ -168,7 +169,7 @@ fn bench_profiler(seqs: &[Vec<u8>]) -> (f64, f64) {
 
 fn bench_euc_dist(profiles: &[(Vec<f64>, Vec<f64>)]) -> (f64, f64) {
     let cpp_count = count_ops(BENCH_DURATION, || {
-        let cpp = maxbin_rs::original_ffi::OriginalEucDist::new(4);
+        let cpp = maxbin_rs_equivalence::original_ffi::OriginalEucDist::new(4);
         for (p1, p2) in profiles {
             std::hint::black_box(cpp.get_dist_profile(p1, p2));
         }
@@ -187,7 +188,7 @@ fn bench_euc_dist(profiles: &[(Vec<f64>, Vec<f64>)]) -> (f64, f64) {
 
 fn bench_spearman_dist(profiles: &[(Vec<f64>, Vec<f64>)]) -> (f64, f64) {
     let cpp_count = count_ops(BENCH_DURATION, || {
-        let cpp = maxbin_rs::original_ffi::OriginalSpearmanDist::new(4);
+        let cpp = maxbin_rs_equivalence::original_ffi::OriginalSpearmanDist::new(4);
         for (p1, p2) in profiles {
             std::hint::black_box(cpp.get_dist_profile(p1, p2));
         }
@@ -207,7 +208,7 @@ fn bench_spearman_dist(profiles: &[(Vec<f64>, Vec<f64>)]) -> (f64, f64) {
 
 fn bench_fasta_parse(path: &std::path::Path, raw_bytes: &[u8]) -> (f64, f64) {
     let cpp_count = count_ops(BENCH_DURATION, || {
-        let reader = maxbin_rs::original_ffi::OriginalFastaReader::new(path);
+        let reader = maxbin_rs_equivalence::original_ffi::OriginalFastaReader::new(path);
         std::hint::black_box(reader.num_records());
     });
 
@@ -223,7 +224,7 @@ fn bench_fasta_parse(path: &std::path::Path, raw_bytes: &[u8]) -> (f64, f64) {
 
 fn bench_abundance_parse(path: &std::path::Path, raw_bytes: &[u8]) -> (f64, f64) {
     let cpp_count = count_ops(BENCH_DURATION, || {
-        let loader = maxbin_rs::original_ffi::OriginalAbundanceLoader::new(path);
+        let loader = maxbin_rs_equivalence::original_ffi::OriginalAbundanceLoader::new(path);
         std::hint::black_box(loader.num_records());
     });
 

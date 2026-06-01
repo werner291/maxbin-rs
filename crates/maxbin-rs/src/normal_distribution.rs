@@ -66,37 +66,4 @@ mod tests {
         // They should differ slightly
         assert!(our_val != std_pi_val);
     }
-
-    #[test]
-    fn ffi_equivalence() {
-        let test_cases = [
-            (0.0, 1.0, 0.0),
-            (0.0, 1.0, 1.0),
-            (0.0, 1.0, -1.0),
-            (5.0, 2.0, 5.0),
-            (5.0, 2.0, 3.0),
-            (5.0, 2.0, 7.0),
-            (10.0, 0.5, 10.0),
-            (10.0, 0.5, 9.5),
-            (-3.0, 1.5, -3.0),
-            (-3.0, 1.5, 0.0),
-            (0.0, 1.0, 3.5),
-            (100.0, 10.0, 95.0),
-        ];
-
-        for &(mean, std, input) in &test_cases {
-            let rust_nd = NormalDistribution::new(mean, std);
-            let cpp_nd = crate::original_ffi::OriginalNormalDistribution::new(mean, std);
-
-            let rust_p = rust_nd.prob(input);
-            let cpp_p = cpp_nd.prob(input);
-
-            assert_eq!(
-                rust_p.to_bits(),
-                cpp_p.to_bits(),
-                "NormalDist not bit-identical for mean={mean}, std={std}, input={input}: \
-                 rust={rust_p:e} cpp={cpp_p:e}"
-            );
-        }
-    }
 }

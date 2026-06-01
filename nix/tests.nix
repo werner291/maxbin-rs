@@ -20,11 +20,13 @@
   maxbin2-trace,
   maxbin2-f64-trace,
   maxbin-rs,
-  maxbin-rs-lto,
+  maxbin-rs-cpp-em,
+  maxbin-rs-cpp-em-lto,
   fraggenescan,
   fraggenescan-rs,
   rust,
   cargo-nextest,
+  maxbin2-src-tarball,
   datasets,
   intermediates,
 }:
@@ -175,7 +177,7 @@ in
         ];
       }
       ''
-        export MAXBIN2_SRC_TARBALL="${maxbin-rs.MAXBIN2_SRC_TARBALL}"
+        export MAXBIN2_SRC_TARBALL="${maxbin2-src-tarball}"
         cp -r ${../.}/* .
         chmod -R u+w .
         cargo nextest run emanager_precision_divergence --no-fail-fast
@@ -190,7 +192,8 @@ in
     runtimeInputs = [
       maxbin2
       maxbin-rs
-      maxbin-rs-lto
+      maxbin-rs-cpp-em
+      maxbin-rs-cpp-em-lto
     ];
     text = ''
       echo "=== C++ LTO Benchmark: CAMI I High EM ==="
@@ -203,7 +206,7 @@ in
       trap 'rm -rf "$WORK"' EXIT
 
       echo "--- Filtering contigs ---"
-      "${maxbin-rs}/bin/maxbin-rs" filter -contig "$CONTIGS" -out "$WORK/test"
+      "${maxbin-rs}/bin/maxbin-rs" filter --contig "$CONTIGS" --out "$WORK/test"
       FILTERED="$WORK/test.contig.tmp"
 
       ABUND="$INTERMEDIATES/abund"
@@ -212,25 +215,25 @@ in
       echo ""
       echo "--- C++ EM (baseline, no LTO) ---"
       CPP_DIR=$(mktemp -d)
-      MAXBIN_RS_DETERMINISTIC=1 "${maxbin-rs}/bin/maxbin-rs" cpp-em \
-        -contig "$FILTERED" -abund "$ABUND" -seed "$SEED" \
-        -out "$CPP_DIR/test" -thread 1
+      MAXBIN_RS_DETERMINISTIC=1 "${maxbin-rs-cpp-em}/bin/maxbin-rs-cpp-em" \
+        --contig "$FILTERED" --abund "$ABUND" --seed "$SEED" \
+        --out "$CPP_DIR/test" --thread 1
       rm -rf "$CPP_DIR"
 
       echo ""
       echo "--- C++ EM (with -flto) ---"
       LTO_DIR=$(mktemp -d)
-      MAXBIN_RS_DETERMINISTIC=1 "${maxbin-rs-lto}/bin/maxbin-rs" cpp-em \
-        -contig "$FILTERED" -abund "$ABUND" -seed "$SEED" \
-        -out "$LTO_DIR/test" -thread 1
+      MAXBIN_RS_DETERMINISTIC=1 "${maxbin-rs-cpp-em-lto}/bin/maxbin-rs-cpp-em" \
+        --contig "$FILTERED" --abund "$ABUND" --seed "$SEED" \
+        --out "$LTO_DIR/test" --thread 1
       rm -rf "$LTO_DIR"
 
       echo ""
       echo "--- Rust EM ---"
       RUST_DIR=$(mktemp -d)
       MAXBIN_RS_DETERMINISTIC=1 "${maxbin-rs}/bin/maxbin-rs" em \
-        -contig "$FILTERED" -abund "$ABUND" -seed "$SEED" \
-        -out "$RUST_DIR/test" -thread 1
+        --contig "$FILTERED" --abund "$ABUND" --seed "$SEED" \
+        --out "$RUST_DIR/test" --thread 1
       rm -rf "$RUST_DIR"
 
       echo ""
@@ -249,6 +252,7 @@ in
     ];
     text = ''
       export MAXBIN2_TEST_CONTIGS="${datasets.bfragilis.contigs}"
+      export MAXBIN2_SRC_TARBALL="${maxbin2-src-tarball}"
       # Copy source to a writable temp dir (Nix store is read-only).
       WORK=$(mktemp -d)
       cp -r ${../.}/* "$WORK/"
@@ -379,11 +383,6 @@ in
         }
       '';
 
-      # Resolve the unwrapped binary (skip the shell wrapper).
-      binaryOf = pkg: "${pkg}/bin/.maxbin-rs-wrapped";
-      # Fallback if the wrapper layout differs.
-      binaryFallback = pkg: "${pkg}/bin/maxbin-rs";
-
     in
     runCommand "disasm-em"
       {
@@ -392,18 +391,12 @@ in
       ''
         ${disasmLib}
 
-        # Find the actual ELF binary (wrapProgram creates a shell wrapper).
-        find_binary() {
-          local pkg="$1"
-          if [ -f "$pkg/bin/.maxbin-rs-wrapped" ]; then
-            echo "$pkg/bin/.maxbin-rs-wrapped"
-          else
-            echo "$pkg/bin/maxbin-rs"
-          fi
-        }
-
-        STD_BIN=$(find_binary "${maxbin-rs}")
-        LTO_BIN=$(find_binary "${maxbin-rs-lto}")
+        # Both the C++ EManager symbols and the Rust EM symbols are present in
+        # the equivalence crate's cpp-em binary: it links the original MaxBin2
+        # C++ via FFI and depends on the maxbin-rs Rust crate. The two builds
+        # differ only in the C++ FFI: standard vs MAXBIN2_CPP_LTO=1.
+        STD_BIN="${maxbin-rs-cpp-em}/bin/maxbin-rs-cpp-em"
+        LTO_BIN="${maxbin-rs-cpp-em-lto}/bin/maxbin-rs-cpp-em"
 
         mkdir -p $out/standard $out/unity
 
