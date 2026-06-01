@@ -50,7 +50,7 @@ fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
     // Rebuild if patch or FFI wrappers change.
-    println!("cargo:rerun-if-changed=nix/maxbin2-cpp-ffi.patch");
+    println!("cargo:rerun-if-changed=vendor/maxbin2-cpp-ffi.patch");
     println!("cargo:rerun-if-changed=vendor/ffi");
     println!("cargo:rerun-if-env-changed=MAXBIN2_SRC_TARBALL");
 
@@ -108,7 +108,7 @@ fn main() {
     fs::remove_dir(&src_subdir).unwrap();
 
     // Step 3: Apply the patch.
-    let patch_path = manifest_dir.join("nix/maxbin2-cpp-ffi.patch");
+    let patch_path = manifest_dir.join("vendor/maxbin2-cpp-ffi.patch");
     // The patch has paths like a/src/EManager.cpp, so we need to adjust.
     // We'll apply with -p2 to strip "a/src/" down to the filename.
     let patch_output = Command::new("patch")

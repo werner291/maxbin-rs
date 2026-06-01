@@ -536,7 +536,7 @@
               ''
                 export MAXBIN_RS_DETERMINISTIC=1
                 export HOME=$(mktemp -d)
-                bash ${./tests/pipeline-trace.sh} \
+                bash ${./crates/maxbin-rs/tests/pipeline-trace.sh} \
                   "${intermediates.cami-small}/contigs.fa" \
                   "${intermediates.cami-small}/abund" \
                   "${intermediates.cami-small}/hmmout"
